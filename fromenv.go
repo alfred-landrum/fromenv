@@ -1,3 +1,7 @@
+// Copyright 2017 Alfred Landrum. All rights reserved.
+// Use of this source code is governed by the license
+// found in the LICENSE.txt file.
+
 package fromenv
 
 import (
