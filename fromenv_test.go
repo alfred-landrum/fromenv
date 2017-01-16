@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testNilLooker() func(*config) error {
+func noLookup() func(*config) error {
 	f := func(string) (*string, error) {
 		panic("unexpected lookup in test")
 	}
@@ -81,33 +81,33 @@ func TestTypeLogic(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	err = Configure(nil, testNilLooker())
+	err = Configure(nil, noLookup())
 	require.EqualError(t, err, "passed non-pointer or nil pointer")
 
 	type S0 struct{}
 	var s0 S0
-	err = Configure(s0, testNilLooker())
+	err = Configure(s0, noLookup())
 	require.EqualError(t, err, "passed non-pointer or nil pointer")
 
 	type S1 struct {
 		notag int
 	}
 	var s1 S1
-	err = Configure(&s1, testNilLooker())
+	err = Configure(&s1, noLookup())
 	require.NoError(t, err)
 
 	type S2 struct {
 		nonexported int `fromenv:"k1"`
 	}
 	var s2 S2
-	err = Configure(&s2, testNilLooker())
+	err = Configure(&s2, noLookup())
 	require.EqualError(t, err, "tag found on unsettable field: field nonexported (int) in struct S2")
 
 	type S3 struct {
 		Nonsupported interface{} `fromenv:"k1"`
 	}
 	var s3 S3
-	err = Configure(&s3, testNilLooker())
+	err = Configure(&s3, noLookup())
 	require.EqualError(t, err, "tag found on unsupported type: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
