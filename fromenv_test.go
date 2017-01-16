@@ -149,7 +149,7 @@ func TestString(t *testing.T) {
 	var s1 S1
 	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
-	require.Equal(t, s1.Str1, "k1-val")
+	require.Equal(t, "k1-val", s1.Str1)
 
 	type S2 struct {
 		Str1 string `fromenv:"k1,not-used-default"`
@@ -158,7 +158,7 @@ func TestString(t *testing.T) {
 	var s2 S2
 	err = Configure(&s2, LookupMap(env))
 	require.NoError(t, err)
-	require.Equal(t, s2.Str1, "k1-val")
+	require.Equal(t, "k1-val", s2.Str1)
 
 	type S3 struct {
 		Str1 string `fromenv:"nokey,def-val,with-comma"`
@@ -167,14 +167,14 @@ func TestString(t *testing.T) {
 	var s3 S3
 	err = Configure(&s3, LookupMap(env))
 	require.NoError(t, err)
-	require.Equal(t, s3.Str1, "def-val,with-comma")
+	require.Equal(t, "def-val,with-comma", s3.Str1)
 }
 
 func TestInt(t *testing.T) {
 	t.Parallel()
 
 	env := map[string]string{
-		"k1": "0",
+		"k1": "1",
 		"k2": "i-am-not-an-int",
 	}
 
@@ -185,10 +185,36 @@ func TestInt(t *testing.T) {
 	var s1 S1
 	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
-	require.Equal(t, s1.Int1, 0)
+	require.Equal(t, int(1), s1.Int1)
 
 	type S2 struct {
 		Int2 int `fromenv:"k2"`
+	}
+
+	var s2 S2
+	err = Configure(&s2, LookupMap(env))
+	require.Contains(t, err.Error(), "failed to configure from k2")
+}
+
+func TestUint(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"k1": "1",
+		"k2": "-1",
+	}
+
+	type S1 struct {
+		Uint1 uint `fromenv:"k1"`
+	}
+
+	var s1 S1
+	err := Configure(&s1, LookupMap(env))
+	require.NoError(t, err)
+	require.Equal(t, uint(1), s1.Uint1)
+
+	type S2 struct {
+		Uint2 uint `fromenv:"k2"`
 	}
 
 	var s2 S2
@@ -211,7 +237,7 @@ func TestBool(t *testing.T) {
 	var s1 S1
 	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
-	require.Equal(t, s1.Bool1, true)
+	require.True(t, s1.Bool1)
 
 	type S2 struct {
 		Bool2 bool `fromenv:"k2"`
