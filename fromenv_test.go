@@ -12,22 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testLooker(m map[string]string) func(*config) error {
-	f := func(key string) (val string, ok bool) {
-		val, ok = m[key]
-		return
-	}
-	return LookupEnv(f)
-}
-
 func testNilLooker() func(*config) error {
-	f := func(string) (string, bool) {
+	f := func(string) (*string, error) {
 		panic("unexpected lookup in test")
 	}
 	return LookupEnv(f)
 }
 
-func TestConfig(t *testing.T) {
+func TestLookupConfig(t *testing.T) {
 	t.Parallel()
 
 	var err error
@@ -41,6 +33,25 @@ func TestConfig(t *testing.T) {
 	}
 	err = Configure(&s1, badconf)
 	require.EqualError(t, err, "config error")
+
+	type S2 struct {
+		Str1 string `fromenv:"k1,Str1-default"`
+	}
+	var s2 S2
+	err = Configure(&s2, DefaultsOnly())
+	require.NoError(t, err)
+	require.Equal(t, "Str1-default", s2.Str1)
+
+	type S3 struct {
+		Str1 string `fromenv:"k1"`
+	}
+	var s3 S3
+	badlookup := func(k string) (*string, error) {
+		require.Equal(t, "k1", k)
+		return nil, errors.New("lookup error")
+	}
+	err = Configure(&s3, LookupEnv(badlookup))
+	require.EqualError(t, err, "lookup error")
 }
 
 func TestVisitLoop(t *testing.T) {
@@ -61,7 +72,7 @@ func TestVisitLoop(t *testing.T) {
 	s1.Sp = &s2
 	s2.Sp = &s1
 
-	err = Configure(&s1, testLooker(env))
+	err = Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Str1, "k1-val")
 }
@@ -118,7 +129,7 @@ func TestTypeLogic(t *testing.T) {
 		S5nilptr: nil,
 		S5ptr:    &S5{},
 	}
-	err = Configure(&s6, testLooker(env6))
+	err = Configure(&s6, LookupMap(env6))
 	require.NoError(t, err)
 	require.Equal(t, env6["S4Str-val"], s6.S4.S4Str)
 	require.Equal(t, env6["S5Str-val"], s6.S5ptr.S5Str)
@@ -136,7 +147,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, testLooker(env))
+	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Str1, "k1-val")
 
@@ -145,7 +156,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, testLooker(env))
+	err = Configure(&s2, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s2.Str1, "k1-val")
 
@@ -154,7 +165,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s3 S3
-	err = Configure(&s3, testLooker(env))
+	err = Configure(&s3, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s3.Str1, "def-val,with-comma")
 }
@@ -172,7 +183,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, testLooker(env))
+	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Int1, 0)
 
@@ -181,7 +192,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, testLooker(env))
+	err = Configure(&s2, LookupMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -198,7 +209,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, testLooker(env))
+	err := Configure(&s1, LookupMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Bool1, true)
 
@@ -207,7 +218,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, testLooker(env))
+	err = Configure(&s2, LookupMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 

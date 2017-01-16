@@ -26,7 +26,7 @@ func Configure(in interface{}, options ...func(*config) error) error {
 		return errors.New("passed non-pointer or nil pointer")
 	}
 	config := &config{
-		looker: os.LookupEnv,
+		looker: osLookup,
 	}
 	for _, option := range options {
 		err := option(config)
@@ -58,26 +58,26 @@ func Configure(in interface{}, options ...func(*config) error) error {
 		// Set the field's value to that retrieved from the environment.
 		// If no environment value is set, and no default is specified
 		// by the tag, leave the field untouched.
-		val, ok := config.looker(key)
-		if !ok {
+		val, err := config.looker(key)
+		if err != nil {
+			return err
+		}
+		if val == nil {
 			if defval == nil {
 				return nil
 			}
-			val = *defval
+			val = defval
 		}
-		if err := setter(fieldValue, val); err != nil {
+		if err := setter(fieldValue, *val); err != nil {
 			return fmt.Errorf("failed to configure from %s: %s", key, err.Error())
 		}
 		return nil
 	})
 }
 
-type config struct {
-	looker LookupEnvFunc
-}
-
 // A LookupEnvFunc retrieves the value of environment variable "key".
-type LookupEnvFunc func(key string) (value string, ok bool)
+// If the key isn't found, a LookupEnvFunc should return nil,nil.
+type LookupEnvFunc func(key string) (value *string, err error)
 
 // LookupEnv sets the environment lookup function.
 func LookupEnv(f LookupEnvFunc) func(*config) error {
@@ -85,6 +85,43 @@ func LookupEnv(f LookupEnvFunc) func(*config) error {
 		c.looker = f
 		return nil
 	}
+}
+
+// LookupMap sets a map[string]string to use for environment lookups.
+func LookupMap(m map[string]string) func(*config) error {
+	return func(c *config) error {
+		c.looker = func(k string) (*string, error) {
+			v, ok := m[k]
+			if ok {
+				return &v, nil
+			}
+			return nil, nil
+		}
+		return nil
+	}
+}
+
+// DefaultsOnly causes no environment lookups to be made, so only
+// fields that specify a default value will be set.
+func DefaultsOnly() func(*config) error {
+	return func(c *config) error {
+		c.looker = func(string) (*string, error) {
+			return nil, nil
+		}
+		return nil
+	}
+}
+
+func osLookup(key string) (*string, error) {
+	val, ok := os.LookupEnv(key)
+	if ok {
+		return &val, nil
+	}
+	return nil, nil
+}
+
+type config struct {
+	looker LookupEnvFunc
 }
 
 func isStructPtr(i interface{}) bool {
