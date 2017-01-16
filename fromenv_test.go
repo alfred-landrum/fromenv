@@ -222,6 +222,32 @@ func TestUint(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
+func TestFloat64(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"k1": "1.5",
+		"k2": "not-a-float",
+	}
+
+	type S1 struct {
+		F1 float64 `fromenv:"k1"`
+	}
+
+	var s1 S1
+	err := Configure(&s1, LookupMap(env))
+	require.NoError(t, err)
+	require.Equal(t, float64(1.5), s1.F1)
+
+	type S2 struct {
+		F2 float64 `fromenv:"k2"`
+	}
+
+	var s2 S2
+	err = Configure(&s2, LookupMap(env))
+	require.Contains(t, err.Error(), "failed to configure from k2")
+}
+
 func TestBool(t *testing.T) {
 	t.Parallel()
 

@@ -197,6 +197,8 @@ func setterFor(kind reflect.Kind) fieldSetter {
 		return intSetter
 	case reflect.Uint:
 		return uintSetter
+	case reflect.Float64:
+		return float64setter
 	case reflect.Bool:
 		return boolSetter
 	}
@@ -217,6 +219,12 @@ func intSetter(field reflect.Value, s string) error {
 func uintSetter(field reflect.Value, s string) error {
 	i, err := strconv.ParseUint(s, 0, 64)
 	field.Set(reflect.ValueOf(uint(i)))
+	return err
+}
+
+func float64setter(field reflect.Value, s string) error {
+	f, err := strconv.ParseFloat(s, 64)
+	field.Set(reflect.ValueOf(float64(f)))
 	return err
 }
 
