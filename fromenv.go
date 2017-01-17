@@ -94,8 +94,7 @@ func LookupEnv(f LookupEnvFunc) Option {
 func UseMap(m map[string]string) Option {
 	return func(c *config) error {
 		c.looker = func(k string) (*string, error) {
-			v, ok := m[k]
-			if ok {
+			if v, ok := m[k]; ok {
 				return &v, nil
 			}
 			return nil, nil
@@ -116,8 +115,7 @@ func DefaultsOnly() Option {
 }
 
 func osLookup(key string) (*string, error) {
-	val, ok := os.LookupEnv(key)
-	if ok {
+	if val, ok := os.LookupEnv(key); ok {
 		return &val, nil
 	}
 	return nil, nil
