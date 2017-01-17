@@ -20,7 +20,7 @@ var (
 // Configure takes a pointer to a struct, recursively looking
 // for any struct fields with the "fromenv" tag set, and sets
 // the field to the value of the specified environment variable.
-func Configure(in interface{}, options ...func(*config) error) error {
+func Configure(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
 		return errors.New("passed non-pointer or nil pointer")
@@ -75,20 +75,23 @@ func Configure(in interface{}, options ...func(*config) error) error {
 	})
 }
 
+// An Option is a functional option for Configure.
+type Option func(*config) error
+
 // A LookupEnvFunc retrieves the value of environment variable "key".
 // If the key isn't found, a LookupEnvFunc should return nil,nil.
 type LookupEnvFunc func(key string) (value *string, err error)
 
 // LookupEnv sets the environment lookup function.
-func LookupEnv(f LookupEnvFunc) func(*config) error {
+func LookupEnv(f LookupEnvFunc) Option {
 	return func(c *config) error {
 		c.looker = f
 		return nil
 	}
 }
 
-// LookupMap sets a map[string]string to use for environment lookups.
-func LookupMap(m map[string]string) func(*config) error {
+// UseMap sets a map[string]string to use for environment lookups.
+func UseMap(m map[string]string) Option {
 	return func(c *config) error {
 		c.looker = func(k string) (*string, error) {
 			v, ok := m[k]
@@ -103,7 +106,7 @@ func LookupMap(m map[string]string) func(*config) error {
 
 // DefaultsOnly causes no environment lookups to be made, so only
 // fields that specify a default value will be set.
-func DefaultsOnly() func(*config) error {
+func DefaultsOnly() Option {
 	return func(c *config) error {
 		c.looker = func(string) (*string, error) {
 			return nil, nil

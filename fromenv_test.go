@@ -72,7 +72,7 @@ func TestVisitLoop(t *testing.T) {
 	s1.Sp = &s2
 	s2.Sp = &s1
 
-	err = Configure(&s1, LookupMap(env))
+	err = Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Str1, "k1-val")
 }
@@ -129,7 +129,7 @@ func TestTypeLogic(t *testing.T) {
 		S5nilptr: nil,
 		S5ptr:    &S5{},
 	}
-	err = Configure(&s6, LookupMap(env6))
+	err = Configure(&s6, UseMap(env6))
 	require.NoError(t, err)
 	require.Equal(t, env6["S4Str-val"], s6.S4.S4Str)
 	require.Equal(t, env6["S5Str-val"], s6.S5ptr.S5Str)
@@ -147,7 +147,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, LookupMap(env))
+	err := Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, "k1-val", s1.Str1)
 
@@ -156,7 +156,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, LookupMap(env))
+	err = Configure(&s2, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, "k1-val", s2.Str1)
 
@@ -165,7 +165,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s3 S3
-	err = Configure(&s3, LookupMap(env))
+	err = Configure(&s3, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, "def-val,with-comma", s3.Str1)
 }
@@ -183,7 +183,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, LookupMap(env))
+	err := Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, int(1), s1.Int1)
 
@@ -192,7 +192,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, LookupMap(env))
+	err = Configure(&s2, UseMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -209,7 +209,7 @@ func TestUint(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, LookupMap(env))
+	err := Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, uint(1), s1.Uint1)
 
@@ -218,7 +218,7 @@ func TestUint(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, LookupMap(env))
+	err = Configure(&s2, UseMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -235,7 +235,7 @@ func TestFloat64(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, LookupMap(env))
+	err := Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.Equal(t, float64(1.5), s1.F1)
 
@@ -244,7 +244,7 @@ func TestFloat64(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, LookupMap(env))
+	err = Configure(&s2, UseMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -261,7 +261,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, LookupMap(env))
+	err := Configure(&s1, UseMap(env))
 	require.NoError(t, err)
 	require.True(t, s1.Bool1)
 
@@ -270,7 +270,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, LookupMap(env))
+	err = Configure(&s2, UseMap(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
