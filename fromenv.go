@@ -60,9 +60,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 		looker: osLookup,
 	}
 	for _, option := range options {
-		if err := option(config); err != nil {
-			return err
-		}
+		option(config)
 	}
 
 	// Visit each struct field reachable from the input interface,
@@ -79,25 +77,23 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 // Map configures Unmarshal to use the given map for environment lookups.
 func Map(m map[string]string) Option {
-	return func(c *config) error {
+	return func(c *config) {
 		c.looker = func(k string) (*string, error) {
 			if v, ok := m[k]; ok {
 				return &v, nil
 			}
 			return nil, nil
 		}
-		return nil
 	}
 }
 
 // DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 // default to that default, ignoring other fields and the environment.
 func DefaultsOnly() Option {
-	return func(c *config) error {
+	return func(c *config) {
 		c.looker = func(string) (*string, error) {
 			return nil, nil
 		}
-		return nil
 	}
 }
 
@@ -109,14 +105,13 @@ type LookupEnvFunc func(key string) (value *string, err error)
 // Looker configures the environment lookup function used during an
 // Unmarshal call.
 func Looker(f LookupEnvFunc) Option {
-	return func(c *config) error {
+	return func(c *config) {
 		c.looker = f
-		return nil
 	}
 }
 
 // An Option is a functional option for Unmarshal.
-type Option func(*config) error
+type Option func(*config)
 
 func osLookup(key string) (*string, error) {
 	if val, ok := os.LookupEnv(key); ok {

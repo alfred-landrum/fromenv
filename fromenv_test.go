@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func noLookup() func(*config) error {
+func noLookup() func(*config) {
 	f := func(string) (*string, error) {
 		panic("unexpected lookup in test")
 	}
@@ -23,16 +23,6 @@ func TestLookupConfig(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	type S1 struct {
-		Str1 string `fromenv:"k1"`
-	}
-	var s1 S1
-
-	badconf := func(c *config) error {
-		return errors.New("config error")
-	}
-	err = Unmarshal(&s1, badconf)
-	require.EqualError(t, err, "config error")
 
 	type S2 struct {
 		Str1 string `fromenv:"k1,Str1-default"`
