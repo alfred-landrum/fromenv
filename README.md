@@ -12,20 +12,20 @@ from the environment.
 
 
 	var c struct {
-		Field1 string 	`fromenv:"FIELD1_KEY,my-default"`
-		Field2 int    	`fromenv:"FIELD2_KEY,7"`
-		Field3 bool   	`fromenv:"FIELD3_KEY"`
-
+		Field1 string  	`fromenv:"FIELD1_KEY,my-default"`
+		Field2 int     	`fromenv:"FIELD2_KEY,7"`
+		Field3 bool    	`fromenv:"FIELD3_KEY"`
+	
 		Inner struct {
 			Field4 string	`fromenv:"FIELD4_KEY"`
 		}
 	}
-
+	
 	os.Setenv("FIELD1_KEY","foo")
 	os.Unsetenv("FIELD2_KEY")
 	os.Setenv("FIELD3_KEY","true")
 	os.Setenv("FIELD4_KEY","inner too!")
-
+	
 	err := fromenv.Unmarshal(&c)
 	// c.Field1 == "foo"
 	// c.Field2 == 7
@@ -45,13 +45,13 @@ from the environment.
 
 
 #### <a name="pkg-files">Package files</a>
-[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go)
+[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) 
 
 
 
 
 
-## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1374:1429#L44)
+## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1385:1440#L44)
 ``` go
 func Unmarshal(in interface{}, options ...Option) error
 ```
@@ -69,7 +69,7 @@ The supported types are string, uint, int, bool, and float64.
 
 
 
-## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=3675:3737#L125)
+## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2677:2739#L93)
 ``` go
 type LookupEnvFunc func(key string) (value *string, err error)
 ```
@@ -86,9 +86,9 @@ is returned.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=3981:4012#L137)
+## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=2964:2989#L104)
 ``` go
-type Option func(*config) error
+type Option func(*config)
 ```
 An Option is a functional option for Unmarshal.
 
@@ -98,7 +98,7 @@ An Option is a functional option for Unmarshal.
 
 
 
-### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3378:3404#L113)
+### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=2399:2425#L82)
 ``` go
 func DefaultsOnly() Option
 ```
@@ -106,7 +106,7 @@ DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 default to that default, ignoring other fields and the environment.
 
 
-### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3826:3861#L129)
+### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=2828:2863#L97)
 ``` go
 func Looker(f LookupEnvFunc) Option
 ```
@@ -114,7 +114,7 @@ Looker configures the environment lookup function used during an
 Unmarshal call.
 
 
-### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3022:3058#L99)
+### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=2062:2098#L69)
 ``` go
 func Map(m map[string]string) Option
 ```

@@ -6,9 +6,9 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string	`fromenv:"FIELD1_KEY,my-default"`
-// 		Field2 int	`fromenv:"FIELD2_KEY,7"`
-// 		Field3 bool	`fromenv:"FIELD3_KEY"`
+// 		Field1 string  	`fromenv:"FIELD1_KEY,my-default"`
+// 		Field2 int     	`fromenv:"FIELD2_KEY,7"`
+// 		Field3 bool    	`fromenv:"FIELD3_KEY"`
 //
 // 		Inner struct {
 // 			Field4 string	`fromenv:"FIELD4_KEY"`
