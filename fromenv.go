@@ -30,6 +30,7 @@ package fromenv
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"reflect"
@@ -50,7 +51,10 @@ var (
 // By default, the "os.LookupEnv" function is used to find the value
 // for an environment variable.
 //
-// The supported types are string, uint, int, bool, and float64.
+// Basic types supported are: string, bool, int, uint8, uint16, uint32,
+// uint64, int, int8, int16, int32, int64, float32, float64.
+//
+// The flag package's Value interface is also supported.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -66,7 +70,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 	// Visit each struct field reachable from the input interface,
 	// processing any fields with the "fromenv" struct tag.
 	return visit(in, func(c cursor) error {
-		strval, err := lookup(c.field, config.looker)
+		strval, err := config.lookup(c.field)
 		if err != nil || strval == nil {
 			return err
 		}
@@ -113,6 +117,15 @@ func Looker(f LookupEnvFunc) Option {
 // An Option is a functional option for Unmarshal.
 type Option func(*config)
 
+func isStructPtr(i interface{}) bool {
+	r := reflect.ValueOf(i)
+	if r.Kind() == reflect.Ptr && !r.IsNil() {
+		r = r.Elem()
+		return r.Kind() == reflect.Struct
+	}
+	return false
+}
+
 func osLookup(key string) (*string, error) {
 	if val, ok := os.LookupEnv(key); ok {
 		return &val, nil
@@ -124,23 +137,33 @@ type config struct {
 	looker LookupEnvFunc
 }
 
-func isStructPtr(i interface{}) bool {
-	r := reflect.ValueOf(i)
-	if r.Kind() == reflect.Ptr && !r.IsNil() {
-		r = r.Elem()
-		return r.Kind() == reflect.Struct
+// lookup parses the tag, looks up the corresponding environment variable,
+// and returns a pointer to its value, or a pointer to its default value
+// if the variable isn't present in the environment, or nil otherwise.
+func (c *config) lookup(field *reflect.StructField) (*string, error) {
+	key, defval := parseTag(field)
+	if len(key) == 0 {
+		return nil, nil
 	}
-	return false
+	val, err := c.looker(key)
+	if err != nil {
+		return nil, err
+	}
+	if val == nil && defval != nil {
+		val = defval
+	}
+	return val, nil
 }
 
-func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
-	if v.Kind() == reflect.Ptr && !v.IsNil() {
-		v = v.Elem()
+// parseTag returns the environment key and possible default value
+// encoded in the field struct tag.
+func parseTag(field *reflect.StructField) (string, *string) {
+	tag := field.Tag.Get(tagName)
+	s := strings.SplitN(tag, ",", 2)
+	if len(s) == 1 {
+		return s[0], nil
 	}
-	if v.Kind() == reflect.Struct {
-		return v, v.CanSet()
-	}
-	return reflect.Value{}, false
+	return s[0], &s[1]
 }
 
 type cursor struct {
@@ -180,38 +203,25 @@ func visit(in interface{}, visitor func(cursor) error) error {
 	return nil
 }
 
-// lookup parses the tag, looks up the corresponding environment variable,
-// and returns a pointer to its value, or a pointer to its default value
-// if the variable isn't present in the environment, or nil otherwise.
-func lookup(field *reflect.StructField, looker LookupEnvFunc) (*string, error) {
-	key, defval := parseTag(field)
-	if len(key) == 0 {
-		return nil, nil
+func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
+	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		v = v.Elem()
 	}
-	val, err := looker(key)
-	if err != nil {
-		return nil, err
+	if v.Kind() == reflect.Struct {
+		return v, v.CanSet()
 	}
-	if val == nil && defval != nil {
-		val = defval
-	}
-	return val, nil
+	return reflect.Value{}, false
 }
 
-// parseTag returns the environment key and possible default value
-// encoded in the field struct tag.
-func parseTag(field *reflect.StructField) (string, *string) {
-	tag := field.Tag.Get(tagName)
-	s := strings.SplitN(tag, ",", 2)
-	if len(s) == 1 {
-		return s[0], nil
-	}
-	return s[0], &s[1]
-}
-
+// Set the struct field at the cursor to the given string.
 func setField(c cursor, str string) error {
 	if !c.value.CanSet() {
-		return errCheck(c, errors.New("tag found on unsettable field"))
+		return setErr(c, errors.New("tag found on unsettable field"))
+	}
+
+	// Support the flag package's Value interface of Set(string):
+	if fv, ok := toFlagValue(c); ok {
+		return setErr(c, fv.Set(str))
 	}
 
 	switch c.value.Kind() {
@@ -220,34 +230,40 @@ func setField(c cursor, str string) error {
 		return nil
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		x, err := strconv.ParseInt(str, 0, c.field.Type.Bits())
+		x, err := strconv.ParseInt(str, 0, c.value.Type().Bits())
 		c.value.SetInt(x)
-		return errCheck(c, err)
+		return setErr(c, err)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		x, err := strconv.ParseUint(str, 0, c.field.Type.Bits())
+		x, err := strconv.ParseUint(str, 0, c.value.Type().Bits())
 		c.value.SetUint(x)
-		return errCheck(c, err)
+		return setErr(c, err)
 
 	case reflect.Float64, reflect.Float32:
-		x, err := strconv.ParseFloat(str, c.field.Type.Bits())
+		x, err := strconv.ParseFloat(str, c.value.Type().Bits())
 		c.value.SetFloat(x)
-		return errCheck(c, err)
+		return setErr(c, err)
 
 	case reflect.Bool:
 		x, err := strconv.ParseBool(str)
 		c.value.SetBool(x)
-		return errCheck(c, err)
+		return setErr(c, err)
 	}
 
-	return errCheck(c, errors.New("tag found on unsupported type"))
+	return setErr(c, errors.New("tag found on unsupported type"))
 }
 
-func errCheck(c cursor, err error) error {
-	if err == nil {
-		return nil
+func toFlagValue(c cursor) (flag.Value, bool) {
+	i := c.value.Addr().Interface()
+	v, ok := i.(flag.Value)
+	return v, ok
+}
+
+func setErr(c cursor, err error) error {
+	if err != nil {
+		err = fmt.Errorf("%s: field %v (%v) in struct %v",
+			err.Error(), c.field.Name,
+			c.value.Kind().String(), c.structType.Name())
 	}
-	return fmt.Errorf("%s: field %v (%v) in struct %v",
-		err.Error(), c.field.Name,
-		c.value.Kind().String(), c.structType.Name())
+	return err
 }

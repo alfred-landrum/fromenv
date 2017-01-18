@@ -7,6 +7,7 @@ package fromenv
 import (
 	"errors"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -283,6 +284,49 @@ func TestBool(t *testing.T) {
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
 	require.Contains(t, err.Error(), "invalid syntax: field Bool2 (bool) in struct S2")
+}
+
+type testFlagValue struct {
+	x bool
+}
+
+func (tfv *testFlagValue) Set(s string) error {
+	if s == "a-setter" {
+		tfv.x = true
+		return nil
+	}
+	return errors.New("not-a-setter")
+}
+
+func (tfv *testFlagValue) String() string {
+	return strconv.FormatBool(tfv.x)
+}
+
+func TestSetter(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"k1": "a-setter",
+		"k2": "not-a-setter",
+	}
+	type testSetter struct{}
+
+	type S1 struct {
+		TFV testFlagValue `fromenv:"k1"`
+	}
+
+	var s1 S1
+	err := Unmarshal(&s1, Map(env))
+	require.NoError(t, err)
+	require.True(t, s1.TFV.x)
+
+	type S2 struct {
+		TFV testFlagValue `fromenv:"k2"`
+	}
+
+	var s2 S2
+	err = Unmarshal(&s2, Map(env))
+	require.Contains(t, err.Error(), "not-a-setter: field TFV (struct) in struct S2")
 }
 
 func TestRealEnvironment(t *testing.T) {
