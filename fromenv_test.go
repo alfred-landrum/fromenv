@@ -100,14 +100,14 @@ func TestTypeLogic(t *testing.T) {
 		nonexported int `fromenv:"k1"`
 	}
 	var s2 S2
-	err = Unmarshal(&s2, noLookup())
+	err = Unmarshal(&s2, Map(map[string]string{"k1": "k1-val"}))
 	require.EqualError(t, err, "tag found on unsettable field: field nonexported (int) in struct S2")
 
 	type S3 struct {
 		Nonsupported interface{} `fromenv:"k1"`
 	}
 	var s3 S3
-	err = Unmarshal(&s3, noLookup())
+	err = Unmarshal(&s3, Map(map[string]string{"k1": "k1-val"}))
 	require.EqualError(t, err, "tag found on unsupported type: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
@@ -214,7 +214,7 @@ func TestInt(t *testing.T) {
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.Contains(t, err.Error(), "failed to configure from k2")
+	require.Contains(t, err.Error(), "invalid syntax: field Int2 (int) in struct S2")
 }
 
 func TestUint(t *testing.T) {
@@ -240,7 +240,7 @@ func TestUint(t *testing.T) {
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.Contains(t, err.Error(), "failed to configure from k2")
+	require.Contains(t, err.Error(), "invalid syntax: field Uint2 (uint) in struct S2")
 }
 
 func TestFloat64(t *testing.T) {
@@ -266,7 +266,7 @@ func TestFloat64(t *testing.T) {
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.Contains(t, err.Error(), "failed to configure from k2")
+	require.Contains(t, err.Error(), "invalid syntax: field F2 (float64) in struct S2")
 }
 
 func TestBool(t *testing.T) {
@@ -292,7 +292,7 @@ func TestBool(t *testing.T) {
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.Contains(t, err.Error(), "failed to configure from k2")
+	require.Contains(t, err.Error(), "invalid syntax: field Bool2 (bool) in struct S2")
 }
 
 func TestRealEnvironment(t *testing.T) {

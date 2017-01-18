@@ -67,41 +67,13 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 	// Visit each struct field reachable from the input interface,
 	// processing any fields with the "fromenv" struct tag.
-	return visit(in, func(structType reflect.Type, field *reflect.StructField, fieldValue reflect.Value) error {
-		key, defval := parseTag(field)
-		if len(key) == 0 {
-			return nil
-		}
-
-		if !fieldValue.CanSet() {
-			// This is likely an unexported field; see Value.CanSet().
-			return fmt.Errorf("tag found on unsettable field: field %v (%v) in struct %v",
-				field.Name, fieldValue.Kind().String(), structType.Name())
-		}
-
-		setter := setterFor(field.Type.Kind())
-		if setter == nil {
-			return fmt.Errorf("tag found on unsupported type: field %v (%v) in struct %v",
-				field.Name, fieldValue.Kind().String(), structType.Name())
-		}
-
-		// Set the field's value to that retrieved from the environment.
-		// If no environment value is set, and no default is specified
-		// by the tag, leave the field untouched.
-		val, err := config.looker(key)
-		if err != nil {
+	return visit(in, func(c cursor) error {
+		strval, err := lookup(c.field, config.looker)
+		if err != nil || strval == nil {
 			return err
 		}
-		if val == nil {
-			if defval == nil {
-				return nil
-			}
-			val = defval
-		}
-		if err := setter(fieldValue, *val); err != nil {
-			return fmt.Errorf("failed to configure from %s: %s", key, err.Error())
-		}
-		return nil
+
+		return setField(c, *strval)
 	})
 }
 
@@ -176,12 +148,15 @@ func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-// A visitFunc is called from visit(...) for each struct field.
-type visitFunc func(structType reflect.Type, structField *reflect.StructField, fieldValue reflect.Value) error
+type cursor struct {
+	structType reflect.Type
+	field      *reflect.StructField
+	value      reflect.Value
+}
 
 // visit executes the visitor pattern on any reachable struct fields
 // starting from input.
-func visit(in interface{}, visitFn visitFunc) error {
+func visit(in interface{}, visitor func(cursor) error) error {
 	prev := make(map[reflect.Value]bool)
 	q := []reflect.Value{reflect.ValueOf(in)}
 
@@ -199,7 +174,8 @@ func visit(in interface{}, visitFn visitFunc) error {
 		for i := 0; i < nfields; i++ {
 			field := stType.Field(i)
 			value := st.Field(i)
-			if err := visitFn(stType, &field, value); err != nil {
+			err := visitor(cursor{stType, &field, value})
+			if err != nil {
 				return err
 			}
 			q = append(q, value)
@@ -207,6 +183,24 @@ func visit(in interface{}, visitFn visitFunc) error {
 	}
 
 	return nil
+}
+
+// lookup parses the tag, looks up the corresponding environment variable,
+// and returns a pointer to its value, or a pointer to its default value
+// if the variable isn't present in the environment, or nil otherwise.
+func lookup(field *reflect.StructField, looker LookupEnvFunc) (*string, error) {
+	key, defval := parseTag(field)
+	if len(key) == 0 {
+		return nil, nil
+	}
+	val, err := looker(key)
+	if err != nil {
+		return nil, err
+	}
+	if val == nil && defval != nil {
+		val = defval
+	}
+	return val, nil
 }
 
 // parseTag returns the environment key and possible default value
@@ -220,49 +214,45 @@ func parseTag(field *reflect.StructField) (string, *string) {
 	return s[0], &s[1]
 }
 
-type fieldSetter func(field reflect.Value, s string) error
-
-func setterFor(kind reflect.Kind) fieldSetter {
-	switch kind {
-	case reflect.String:
-		return stringSetter
-	case reflect.Int:
-		return intSetter
-	case reflect.Uint:
-		return uintSetter
-	case reflect.Float64:
-		return float64setter
-	case reflect.Bool:
-		return boolSetter
+func setField(c cursor, str string) error {
+	if !c.value.CanSet() {
+		return errCheck(c, errors.New("tag found on unsettable field"))
 	}
-	return nil
+
+	switch c.value.Kind() {
+	case reflect.String:
+		c.value.SetString(str)
+		return nil
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		x, err := strconv.ParseInt(str, 0, c.field.Type.Bits())
+		c.value.SetInt(x)
+		return errCheck(c, err)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		x, err := strconv.ParseUint(str, 0, c.field.Type.Bits())
+		c.value.SetUint(x)
+		return errCheck(c, err)
+
+	case reflect.Float64, reflect.Float32:
+		x, err := strconv.ParseFloat(str, c.field.Type.Bits())
+		c.value.SetFloat(x)
+		return errCheck(c, err)
+
+	case reflect.Bool:
+		x, err := strconv.ParseBool(str)
+		c.value.SetBool(x)
+		return errCheck(c, err)
+	}
+
+	return errCheck(c, errors.New("tag found on unsupported type"))
 }
 
-func stringSetter(field reflect.Value, s string) error {
-	field.Set(reflect.ValueOf(s))
-	return nil
-}
-
-func intSetter(field reflect.Value, s string) error {
-	i, err := strconv.ParseInt(s, 0, 64)
-	field.Set(reflect.ValueOf(int(i)))
-	return err
-}
-
-func uintSetter(field reflect.Value, s string) error {
-	i, err := strconv.ParseUint(s, 0, 64)
-	field.Set(reflect.ValueOf(uint(i)))
-	return err
-}
-
-func float64setter(field reflect.Value, s string) error {
-	f, err := strconv.ParseFloat(s, 64)
-	field.Set(reflect.ValueOf(float64(f)))
-	return err
-}
-
-func boolSetter(field reflect.Value, s string) error {
-	b, err := strconv.ParseBool(s)
-	field.Set(reflect.ValueOf(b))
-	return err
+func errCheck(c cursor, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: field %v (%v) in struct %v",
+		err.Error(), c.field.Name,
+		c.value.Kind().String(), c.structType.Name())
 }
