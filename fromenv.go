@@ -2,6 +2,29 @@
 // Use of this source code is governed by the license
 // found in the LICENSE.txt file.
 
+// Package fromenv can set specially tagged struct fields with values
+// from the environment.
+//
+//	var c struct {
+// 		Field1 string 	`fromenv:"FIELD1_KEY,my-default"`
+// 		Field2 int 	`fromenv:"FIELD2_KEY,7"`
+// 		Field3 bool 	`fromenv:"FIELD3_KEY"`
+// 		Inner struct {
+// 			Field4 string `fromenv:"FIELD4_KEY"`
+// 		}
+// 	}
+//
+// 	os.Setenv("FIELD1_KEY","foo")
+// 	os.Unsetenv("FIELD2_KEY")
+// 	os.Setenv("FIELD3_KEY","true")
+// 	os.Setenv("FIELD4_KEY","inner too!")
+//
+// 	err := fromenv.Unmarshal(&c)
+// 	// c.Field1 == "foo"
+// 	// c.Field2 == 7
+// 	// c.Field3 == true
+// 	// c.InnerwField4 == "inner too!"
+//
 package fromenv
 
 import (
@@ -17,10 +40,15 @@ var (
 	tagName = "fromenv"
 )
 
-// Configure takes a pointer to a struct, recursively looking
-// for any struct fields with the "fromenv" tag set, and sets
-// the field to the value of the specified environment variable.
-func Configure(in interface{}, options ...Option) error {
+// Unmarshal takes a pointer to a struct, recursively looks for struct
+// fields with a "fromenv" tag, and sets the field to the value of the
+// environment variable given in the tag. A fromenv tag may optionally
+// specify a default value; the field will be set to this value if the
+// environment variable is not present.
+//
+// By default, the "os.LookupEnv" function is used to find the value
+// for an environment variable.
+func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
 		return errors.New("passed non-pointer or nil pointer")
@@ -29,8 +57,7 @@ func Configure(in interface{}, options ...Option) error {
 		looker: osLookup,
 	}
 	for _, option := range options {
-		err := option(config)
-		if err != nil {
+		if err := option(config); err != nil {
 			return err
 		}
 	}
@@ -75,23 +102,8 @@ func Configure(in interface{}, options ...Option) error {
 	})
 }
 
-// An Option is a functional option for Configure.
-type Option func(*config) error
-
-// A LookupEnvFunc retrieves the value of environment variable "key".
-// If the key isn't found, a LookupEnvFunc should return nil,nil.
-type LookupEnvFunc func(key string) (value *string, err error)
-
-// LookupEnv sets the environment lookup function.
-func LookupEnv(f LookupEnvFunc) Option {
-	return func(c *config) error {
-		c.looker = f
-		return nil
-	}
-}
-
-// UseMap sets a map[string]string to use for environment lookups.
-func UseMap(m map[string]string) Option {
+// Map configures Unmarshal to use the given map for environment lookups.
+func Map(m map[string]string) Option {
 	return func(c *config) error {
 		c.looker = func(k string) (*string, error) {
 			if v, ok := m[k]; ok {
@@ -103,8 +115,8 @@ func UseMap(m map[string]string) Option {
 	}
 }
 
-// DefaultsOnly causes no environment lookups to be made, so only
-// fields that specify a default value will be set.
+// DefaultsOnly configures Unmarshal to only set fields with a tag-defined
+// default to that default, ignoring other fields and the environment.
 func DefaultsOnly() Option {
 	return func(c *config) error {
 		c.looker = func(string) (*string, error) {
@@ -113,6 +125,23 @@ func DefaultsOnly() Option {
 		return nil
 	}
 }
+
+// A LookupEnvFunc retrieves the value of the environment variable
+// named by the key. If the variable isn't present, a nil pointer
+// is returned.
+type LookupEnvFunc func(key string) (value *string, err error)
+
+// Looker configures the environment lookup function used during an
+// Unmarshal call.
+func Looker(f LookupEnvFunc) Option {
+	return func(c *config) error {
+		c.looker = f
+		return nil
+	}
+}
+
+// An Option is a functional option for Unmarshal.
+type Option func(*config) error
 
 func osLookup(key string) (*string, error) {
 	if val, ok := os.LookupEnv(key); ok {
@@ -147,8 +176,8 @@ func structValue(v reflect.Value) (reflect.Value, bool) {
 // A visitFunc is called from visit(...) for each struct field.
 type visitFunc func(structType reflect.Type, structField *reflect.StructField, fieldValue reflect.Value) error
 
-// visit executes the visitor pattern on any recursively reachable
-// struct fields starting from input.
+// visit executes the visitor pattern on any reachable struct fields
+// starting from input.
 func visit(in interface{}, visitFn visitFunc) error {
 	prev := make(map[reflect.Value]bool)
 	q := []reflect.Value{reflect.ValueOf(in)}

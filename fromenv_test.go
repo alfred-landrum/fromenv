@@ -16,7 +16,7 @@ func noLookup() func(*config) error {
 	f := func(string) (*string, error) {
 		panic("unexpected lookup in test")
 	}
-	return LookupEnv(f)
+	return Looker(f)
 }
 
 func TestLookupConfig(t *testing.T) {
@@ -31,14 +31,14 @@ func TestLookupConfig(t *testing.T) {
 	badconf := func(c *config) error {
 		return errors.New("config error")
 	}
-	err = Configure(&s1, badconf)
+	err = Unmarshal(&s1, badconf)
 	require.EqualError(t, err, "config error")
 
 	type S2 struct {
 		Str1 string `fromenv:"k1,Str1-default"`
 	}
 	var s2 S2
-	err = Configure(&s2, DefaultsOnly())
+	err = Unmarshal(&s2, DefaultsOnly())
 	require.NoError(t, err)
 	require.Equal(t, "Str1-default", s2.Str1)
 
@@ -50,7 +50,7 @@ func TestLookupConfig(t *testing.T) {
 		require.Equal(t, "k1", k)
 		return nil, errors.New("lookup error")
 	}
-	err = Configure(&s3, LookupEnv(badlookup))
+	err = Unmarshal(&s3, Looker(badlookup))
 	require.EqualError(t, err, "lookup error")
 }
 
@@ -72,7 +72,7 @@ func TestVisitLoop(t *testing.T) {
 	s1.Sp = &s2
 	s2.Sp = &s1
 
-	err = Configure(&s1, UseMap(env))
+	err = Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, s1.Str1, "k1-val")
 }
@@ -81,33 +81,33 @@ func TestTypeLogic(t *testing.T) {
 	t.Parallel()
 
 	var err error
-	err = Configure(nil, noLookup())
+	err = Unmarshal(nil, noLookup())
 	require.EqualError(t, err, "passed non-pointer or nil pointer")
 
 	type S0 struct{}
 	var s0 S0
-	err = Configure(s0, noLookup())
+	err = Unmarshal(s0, noLookup())
 	require.EqualError(t, err, "passed non-pointer or nil pointer")
 
 	type S1 struct {
 		notag int
 	}
 	var s1 S1
-	err = Configure(&s1, noLookup())
+	err = Unmarshal(&s1, noLookup())
 	require.NoError(t, err)
 
 	type S2 struct {
 		nonexported int `fromenv:"k1"`
 	}
 	var s2 S2
-	err = Configure(&s2, noLookup())
+	err = Unmarshal(&s2, noLookup())
 	require.EqualError(t, err, "tag found on unsettable field: field nonexported (int) in struct S2")
 
 	type S3 struct {
 		Nonsupported interface{} `fromenv:"k1"`
 	}
 	var s3 S3
-	err = Configure(&s3, noLookup())
+	err = Unmarshal(&s3, noLookup())
 	require.EqualError(t, err, "tag found on unsupported type: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
@@ -129,7 +129,7 @@ func TestTypeLogic(t *testing.T) {
 		S5nilptr: nil,
 		S5ptr:    &S5{},
 	}
-	err = Configure(&s6, UseMap(env6))
+	err = Unmarshal(&s6, Map(env6))
 	require.NoError(t, err)
 	require.Equal(t, env6["S4Str-val"], s6.S4.S4Str)
 	require.Equal(t, env6["S5Str-val"], s6.S5ptr.S5Str)
@@ -147,7 +147,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, UseMap(env))
+	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, "k1-val", s1.Str1)
 
@@ -156,7 +156,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, UseMap(env))
+	err = Unmarshal(&s2, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, "k1-val", s2.Str1)
 
@@ -165,7 +165,7 @@ func TestString(t *testing.T) {
 	}
 
 	var s3 S3
-	err = Configure(&s3, UseMap(env))
+	err = Unmarshal(&s3, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, "def-val,with-comma", s3.Str1)
 }
@@ -183,7 +183,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, UseMap(env))
+	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, int(1), s1.Int1)
 
@@ -192,7 +192,7 @@ func TestInt(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, UseMap(env))
+	err = Unmarshal(&s2, Map(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -209,7 +209,7 @@ func TestUint(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, UseMap(env))
+	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, uint(1), s1.Uint1)
 
@@ -218,7 +218,7 @@ func TestUint(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, UseMap(env))
+	err = Unmarshal(&s2, Map(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -235,7 +235,7 @@ func TestFloat64(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, UseMap(env))
+	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.Equal(t, float64(1.5), s1.F1)
 
@@ -244,7 +244,7 @@ func TestFloat64(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, UseMap(env))
+	err = Unmarshal(&s2, Map(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -261,7 +261,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s1 S1
-	err := Configure(&s1, UseMap(env))
+	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
 	require.True(t, s1.Bool1)
 
@@ -270,7 +270,7 @@ func TestBool(t *testing.T) {
 	}
 
 	var s2 S2
-	err = Configure(&s2, UseMap(env))
+	err = Unmarshal(&s2, Map(env))
 	require.Contains(t, err.Error(), "failed to configure from k2")
 }
 
@@ -295,7 +295,7 @@ func TestRealEnvironment(t *testing.T) {
 
 	unsetKeys()
 	var s1 S
-	err = Configure(&s1)
+	err = Unmarshal(&s1)
 	require.NoError(t, err)
 	require.Equal(t, s1.Str1, "")
 	require.Equal(t, s1.Str2, "str2-def")
@@ -304,7 +304,7 @@ func TestRealEnvironment(t *testing.T) {
 	os.Setenv("fromenv_test_key1", "key1-value")
 	os.Setenv("fromenv_test_key2", "key2-value")
 	var s2 S
-	err = Configure(&s2)
+	err = Unmarshal(&s2)
 	require.NoError(t, err)
 	require.Equal(t, s2.Str1, "key1-value")
 	require.Equal(t, s2.Str2, "key2-value")
