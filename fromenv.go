@@ -6,11 +6,12 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string 	`fromenv:"FIELD1_KEY,my-default"`
-// 		Field2 int 	`fromenv:"FIELD2_KEY,7"`
-// 		Field3 bool 	`fromenv:"FIELD3_KEY"`
+// 		Field1 string	`fromenv:"FIELD1_KEY,my-default"`
+// 		Field2 int	`fromenv:"FIELD2_KEY,7"`
+// 		Field3 bool	`fromenv:"FIELD3_KEY"`
+//
 // 		Inner struct {
-// 			Field4 string `fromenv:"FIELD4_KEY"`
+// 			Field4 string	`fromenv:"FIELD4_KEY"`
 // 		}
 // 	}
 //
@@ -23,7 +24,7 @@
 // 	// c.Field1 == "foo"
 // 	// c.Field2 == 7
 // 	// c.Field3 == true
-// 	// c.InnerwField4 == "inner too!"
+// 	// c.Inner.Field4 == "inner too!"
 //
 package fromenv
 
@@ -48,6 +49,8 @@ var (
 //
 // By default, the "os.LookupEnv" function is used to find the value
 // for an environment variable.
+//
+// The supported types are string, uint, int, bool, and float64.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
