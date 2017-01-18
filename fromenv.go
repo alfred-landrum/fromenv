@@ -163,12 +163,12 @@ func isStructPtr(i interface{}) bool {
 	return false
 }
 
-func structValue(v reflect.Value) (reflect.Value, bool) {
+func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 	if v.Kind() == reflect.Ptr && !v.IsNil() {
 		v = v.Elem()
 	}
 	if v.Kind() == reflect.Struct {
-		return v, true
+		return v, v.CanSet()
 	}
 	return reflect.Value{}, false
 }
@@ -185,7 +185,7 @@ func visit(in interface{}, visitFn visitFunc) error {
 	for len(q) != 0 {
 		var v reflect.Value
 		v, q = q[0], q[1:]
-		st, ok := structValue(v)
+		st, ok := settableStructPtr(v)
 		if !ok || prev[st] {
 			continue
 		}

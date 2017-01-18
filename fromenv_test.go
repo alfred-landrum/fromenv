@@ -111,10 +111,10 @@ func TestTypeLogic(t *testing.T) {
 	require.EqualError(t, err, "tag found on unsupported type: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
-		S4Str string `fromenv:"S4Str-val"`
+		S4Str string `fromenv:"S4Str"`
 	}
 	type S5 struct {
-		S5Str string `fromenv:"S5Str-val"`
+		S5Str string `fromenv:"S5Str"`
 	}
 	type S6 struct {
 		S4       S4
@@ -122,8 +122,8 @@ func TestTypeLogic(t *testing.T) {
 		S5nilptr *S5
 	}
 	env6 := map[string]string{
-		"S4Int": "S4Int-val",
-		"S5Int": "S5Int-val",
+		"S4Str": "S4Str-val",
+		"S5Str": "S5Str-val",
 	}
 	s6 := S6{
 		S5nilptr: nil,
@@ -131,8 +131,29 @@ func TestTypeLogic(t *testing.T) {
 	}
 	err = Unmarshal(&s6, Map(env6))
 	require.NoError(t, err)
-	require.Equal(t, env6["S4Str-val"], s6.S4.S4Str)
-	require.Equal(t, env6["S5Str-val"], s6.S5ptr.S5Str)
+	require.Equal(t, env6["S4Str"], s6.S4.S4Str)
+	require.Equal(t, env6["S5Str"], s6.S5ptr.S5Str)
+	require.Nil(t, s6.S5nilptr)
+
+	type S7 struct {
+		S7str string `fromenv:"S7str,S7default"`
+	}
+	type S8 struct {
+		S8str string `fromenv:"S8str,S8default"`
+		S7    S7
+	}
+	type S9 struct {
+		unexportedS8 S8
+	}
+	env10 := map[string]string{
+		"S7str": "S7str-val",
+		"S8str": "S8str-val",
+	}
+	var s9 S9
+	err = Unmarshal(&s9, Map(env10))
+	require.NoError(t, err)
+	require.Empty(t, s9.unexportedS8.S7.S7str)
+	require.Empty(t, s9.unexportedS8.S8str)
 }
 
 func TestString(t *testing.T) {
