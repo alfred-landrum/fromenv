@@ -70,12 +70,12 @@ func Unmarshal(in interface{}, options ...Option) error {
 	// Visit each struct field reachable from the input interface,
 	// processing any fields with the "fromenv" struct tag.
 	return visit(in, func(c cursor) error {
-		strval, err := config.lookup(c.field)
-		if err != nil || strval == nil {
+		value, err := config.lookup(c.field)
+		if err != nil || value == nil {
 			return err
 		}
 
-		return setField(c, *strval)
+		return setField(c, *value)
 	})
 }
 
@@ -94,11 +94,7 @@ func Map(m map[string]string) Option {
 // DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 // default to that default, ignoring other fields and the environment.
 func DefaultsOnly() Option {
-	return func(c *config) {
-		c.looker = func(string) (*string, error) {
-			return nil, nil
-		}
-	}
+	return Map(nil)
 }
 
 // A LookupEnvFunc retrieves the value of the environment variable
@@ -140,19 +136,15 @@ type config struct {
 // lookup parses the tag, looks up the corresponding environment variable,
 // and returns a pointer to its value, or a pointer to its default value
 // if the variable isn't present in the environment, or nil otherwise.
-func (c *config) lookup(field *reflect.StructField) (*string, error) {
+func (c *config) lookup(field *reflect.StructField) (val *string, err error) {
 	key, defval := parseTag(field)
-	if len(key) == 0 {
-		return nil, nil
+	if len(key) != 0 {
+		val, err = c.looker(key)
+		if val == nil {
+			val = defval
+		}
 	}
-	val, err := c.looker(key)
-	if err != nil {
-		return nil, err
-	}
-	if val == nil && defval != nil {
-		val = defval
-	}
-	return val, nil
+	return
 }
 
 // parseTag returns the environment key and possible default value
