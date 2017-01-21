@@ -79,24 +79,6 @@ func Unmarshal(in interface{}, options ...Option) error {
 	})
 }
 
-// Map configures Unmarshal to use the given map for environment lookups.
-func Map(m map[string]string) Option {
-	return func(c *config) {
-		c.looker = func(k string) (*string, error) {
-			if v, ok := m[k]; ok {
-				return &v, nil
-			}
-			return nil, nil
-		}
-	}
-}
-
-// DefaultsOnly configures Unmarshal to only set fields with a tag-defined
-// default to that default, ignoring other fields and the environment.
-func DefaultsOnly() Option {
-	return Map(nil)
-}
-
 // A LookupEnvFunc retrieves the value of the environment variable
 // named by the key. If the variable isn't present, a nil pointer
 // is returned.
@@ -108,6 +90,22 @@ func Looker(f LookupEnvFunc) Option {
 	return func(c *config) {
 		c.looker = f
 	}
+}
+
+// Map configures Unmarshal to use the given map for environment lookups.
+func Map(m map[string]string) Option {
+	return Looker(func(k string) (*string, error) {
+		if v, ok := m[k]; ok {
+			return &v, nil
+		}
+		return nil, nil
+	})
+}
+
+// DefaultsOnly configures Unmarshal to only set fields with a tag-defined
+// default to that default, ignoring other fields and the environment.
+func DefaultsOnly() Option {
+	return Map(nil)
 }
 
 // An Option is a functional option for Unmarshal.
