@@ -75,7 +75,12 @@ func Unmarshal(in interface{}, options ...Option) error {
 			return err
 		}
 
-		return setField(c, *value)
+		if err = setField(c, *value); err != nil {
+			err = fmt.Errorf("%s: field %v (%v) in struct %v",
+				err.Error(), c.field.Name,
+				c.value.Kind().String(), c.structType.Name())
+		}
+		return err
 	})
 }
 
@@ -114,17 +119,16 @@ type Option func(*config)
 func isStructPtr(i interface{}) bool {
 	r := reflect.ValueOf(i)
 	if r.Kind() == reflect.Ptr && !r.IsNil() {
-		r = r.Elem()
-		return r.Kind() == reflect.Struct
+		return r.Elem().Kind() == reflect.Struct
 	}
 	return false
 }
 
-func osLookup(key string) (*string, error) {
-	if val, ok := os.LookupEnv(key); ok {
-		return &val, nil
+func osLookup(key string) (val *string, err error) {
+	if v, ok := os.LookupEnv(key); ok {
+		val = &v
 	}
-	return nil, nil
+	return
 }
 
 type config struct {
@@ -204,14 +208,14 @@ func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 }
 
 // Set the struct field at the cursor to the given string.
-func setField(c cursor, str string) error {
+func setField(c cursor, str string) (err error) {
 	if !c.value.CanSet() {
-		return setErr(c, errors.New("tag found on unsettable field"))
+		return errors.New("tag found on unsettable field")
 	}
 
 	// Support the flag package's Value interface of Set(string):
 	if fv, ok := toFlagValue(c); ok {
-		return setErr(c, fv.Set(str))
+		return fv.Set(str)
 	}
 
 	switch c.value.Kind() {
@@ -222,38 +226,29 @@ func setField(c cursor, str string) error {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		x, err := strconv.ParseInt(str, 0, c.value.Type().Bits())
 		c.value.SetInt(x)
-		return setErr(c, err)
+		return err
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		x, err := strconv.ParseUint(str, 0, c.value.Type().Bits())
 		c.value.SetUint(x)
-		return setErr(c, err)
+		return err
 
 	case reflect.Float64, reflect.Float32:
 		x, err := strconv.ParseFloat(str, c.value.Type().Bits())
 		c.value.SetFloat(x)
-		return setErr(c, err)
+		return err
 
 	case reflect.Bool:
 		x, err := strconv.ParseBool(str)
 		c.value.SetBool(x)
-		return setErr(c, err)
+		return err
 	}
 
-	return setErr(c, errors.New("tag found on unsupported type"))
+	return errors.New("tag found on unsupported type")
 }
 
 func toFlagValue(c cursor) (flag.Value, bool) {
 	i := c.value.Addr().Interface()
 	v, ok := i.(flag.Value)
 	return v, ok
-}
-
-func setErr(c cursor, err error) error {
-	if err != nil {
-		err = fmt.Errorf("%s: field %v (%v) in struct %v",
-			err.Error(), c.field.Name,
-			c.value.Kind().String(), c.structType.Name())
-	}
-	return err
 }
