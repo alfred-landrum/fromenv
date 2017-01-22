@@ -41,7 +41,7 @@ func TestLookupConfig(t *testing.T) {
 		return nil, errors.New("lookup error")
 	}
 	err = Unmarshal(&s3, Looker(badlookup))
-	require.EqualError(t, err, "lookup error")
+	require.EqualError(t, err, "lookup error: field Str1 (string) in struct S3")
 }
 
 func TestVisitLoop(t *testing.T) {
@@ -91,14 +91,14 @@ func TestTypeLogic(t *testing.T) {
 	}
 	var s2 S2
 	err = Unmarshal(&s2, Map(map[string]string{"k1": "k1-val"}))
-	require.EqualError(t, err, "tag found on unsettable field: field nonexported (int) in struct S2")
+	require.EqualError(t, err, "unsettable field: field nonexported (int) in struct S2")
 
 	type S3 struct {
 		Nonsupported interface{} `fromenv:"k1"`
 	}
 	var s3 S3
 	err = Unmarshal(&s3, Map(map[string]string{"k1": "k1-val"}))
-	require.EqualError(t, err, "tag found on unsupported type: field Nonsupported (interface) in struct S3")
+	require.EqualError(t, err, "unsupported type: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
 		S4Str string `fromenv:"S4Str"`
