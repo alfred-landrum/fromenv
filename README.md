@@ -1,5 +1,7 @@
 [![Build Status](https://travis-ci.org/alfred-landrum/fromenv.svg?branch=master)](https://travis-ci.org/alfred-landrum/fromenv)
 
+[![codecov](https://codecov.io/gh/alfred-landrum/fromenv/branch/master/graph/badge.svg)](https://codecov.io/gh/alfred-landrum/fromenv)
+
 # fromenv
 `import "github.com/alfred-landrum/fromenv"`
 
