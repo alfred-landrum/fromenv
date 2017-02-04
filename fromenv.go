@@ -31,6 +31,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -255,3 +256,24 @@ func toFlagValue(value reflect.Value) (flag.Value, bool) {
 	fv, ok := i.(flag.Value)
 	return fv, ok
 }
+
+// URL merely provides a net/url.URL wrapper that matches the flag.Value
+// interface for ease of using with fromenv.
+type URL url.URL
+
+// Set calls url.ParseRequestURI on the input string; on success, this
+// instance is set to the parsed net/url.URL result.
+func (u *URL) Set(s string) error {
+	nu, err := url.ParseRequestURI(s)
+	if err != nil {
+		return err
+	}
+	*u = URL(*nu)
+	return nil
+}
+
+func (u *URL) String() string {
+	return (*url.URL)(u).String()
+}
+
+var _ flag.Value = (*URL)(nil)
