@@ -1,5 +1,4 @@
 [![Build Status](https://travis-ci.org/alfred-landrum/fromenv.svg?branch=master)](https://travis-ci.org/alfred-landrum/fromenv)
-
 [![codecov](https://codecov.io/gh/alfred-landrum/fromenv/branch/master/graph/badge.svg)](https://codecov.io/gh/alfred-landrum/fromenv)
 
 # fromenv
@@ -17,17 +16,17 @@ from the environment.
 		Field1 string  	`fromenv:"FIELD1_KEY,my-default"`
 		Field2 int     	`fromenv:"FIELD2_KEY,7"`
 		Field3 bool    	`fromenv:"FIELD3_KEY"`
-	
+
 		Inner struct {
 			Field4 string	`fromenv:"FIELD4_KEY"`
 		}
 	}
-	
+
 	os.Setenv("FIELD1_KEY","foo")
 	os.Unsetenv("FIELD2_KEY")
 	os.Setenv("FIELD3_KEY","true")
 	os.Setenv("FIELD4_KEY","inner too!")
-	
+
 	err := fromenv.Unmarshal(&c)
 	// c.Field1 == "foo"
 	// c.Field2 == 7
@@ -50,7 +49,7 @@ from the environment.
 
 
 #### <a name="pkg-files">Package files</a>
-[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) [types.go](/src/github.com/alfred-landrum/fromenv/types.go) 
+[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) [types.go](/src/github.com/alfred-landrum/fromenv/types.go)
 
 
 

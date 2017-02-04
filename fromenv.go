@@ -9,15 +9,14 @@
 // 		Field1 string  	`fromenv:"FIELD1_KEY,my-default"`
 // 		Field2 int     	`fromenv:"FIELD2_KEY,7"`
 // 		Field3 bool    	`fromenv:"FIELD3_KEY"`
-//
 // 		Inner struct {
 // 			Field4 string	`fromenv:"FIELD4_KEY"`
 // 		}
 // 	}
 //
 // 	os.Setenv("FIELD1_KEY","foo")
-// 	os.Unsetenv("FIELD2_KEY")
-// 	os.Setenv("FIELD3_KEY","true")
+// 	os.Unsetenv("FIELD2_KEY") // show default usage
+// 	os.Setenv("FIELD3_KEY","true") // or 1, "1", etc.
 // 	os.Setenv("FIELD4_KEY","inner too!")
 //
 // 	err := fromenv.Unmarshal(&c)
@@ -49,12 +48,14 @@ var (
 // environment variable is not present.
 //
 // By default, the "os.LookupEnv" function is used to find the value
-// for an environment variable.
+// for an environment variable. See "Map" for an example of using a
+// different lookup technique.
 //
 // Basic types supported are: string, bool, int, uint8, uint16, uint32,
 // uint64, int, int8, int16, int32, int64, float32, float64.
 //
-// The flag package's Value interface is also supported.
+// Additionally, any type that implements the "flag.Value" interface
+// is also supported. See the "URL" type for an example.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -136,8 +137,7 @@ type config struct {
 }
 
 // lookup parses the tag, looks up the corresponding environment variable,
-// and returns a pointer to its value, or a pointer to its default value
-// if the variable isn't present in the environment, or nil otherwise.
+// and returns a pointer to its value, or to its default value, or nil.
 func (c *config) lookup(field *reflect.StructField) (val *string, err error) {
 	key, defval := parseTag(field)
 	if len(key) != 0 {
@@ -166,8 +166,7 @@ type cursor struct {
 	value      reflect.Value
 }
 
-// visit executes the visitor pattern on any reachable struct fields
-// starting from input.
+// visit executes visitor on any reachable struct fields from input.
 func visit(in interface{}, visitor func(cursor) error) error {
 	prev := make(map[reflect.Value]bool)
 	q := []reflect.Value{reflect.ValueOf(in)}
