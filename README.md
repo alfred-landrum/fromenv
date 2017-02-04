@@ -1,4 +1,4 @@
-
+[![Build Status](https://travis-ci.org/alfred-landrum/fromenv.svg?branch=master)](https://travis-ci.org/alfred-landrum/fromenv)
 
 # fromenv
 `import "github.com/alfred-landrum/fromenv"`
