@@ -71,11 +71,24 @@ func Unmarshal(in interface{}, options ...Option) error {
 	// Visit each struct field reachable from the input interface,
 	// processing any fields with the "fromenv" struct tag.
 	return visit(in, func(c cursor) error {
-		str, err := config.lookup(c.field)
-		if err == nil && str != nil {
-			err = setValue(c.value, *str)
+		key, defval := parseTag(c.field)
+		if len(key) == 0 {
+			return nil
 		}
 
+		val, err := config.looker(key)
+		if err != nil {
+			return err
+		}
+
+		if val == nil {
+			if defval == nil {
+				return nil
+			}
+			val = defval
+		}
+
+		err = setValue(c.value, *val)
 		if err != nil {
 			err = fmt.Errorf("%s: field %v (%v) in struct %v",
 				err.Error(), c.field.Name,
@@ -134,19 +147,6 @@ func osLookup(key string) (val *string, err error) {
 
 type config struct {
 	looker LookupEnvFunc
-}
-
-// lookup parses the tag, looks up the corresponding environment variable,
-// and returns a pointer to its value, or to its default value, or nil.
-func (c *config) lookup(field *reflect.StructField) (val *string, err error) {
-	key, defval := parseTag(field)
-	if len(key) != 0 {
-		val, err = c.looker(key)
-		if val == nil {
-			val = defval
-		}
-	}
-	return
 }
 
 // parseTag returns the environment key and possible default value
