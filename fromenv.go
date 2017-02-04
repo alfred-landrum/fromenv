@@ -78,7 +78,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 		val, err := config.looker(key)
 		if err != nil {
-			return err
+			goto reterr
 		}
 
 		if val == nil {
@@ -90,10 +90,14 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 		err = setValue(c.value, *val)
 		if err != nil {
-			err = fmt.Errorf("%s: field %v (%v) in struct %v",
-				err.Error(), c.field.Name,
-				c.value.Kind().String(), c.structType.Name())
+			goto reterr
 		}
+
+		return nil
+
+	reterr:
+		err = fmt.Errorf("%s: field %v (%v) in struct %v", err.Error(),
+			c.field.Name, c.value.Kind().String(), c.structType.Name())
 		return err
 	})
 }
