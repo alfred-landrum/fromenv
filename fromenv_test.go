@@ -157,7 +157,6 @@ func TestRealEnvironment(t *testing.T) {
 			os.Unsetenv(k)
 		}
 	}
-	unsetKeys()
 	defer unsetKeys()
 
 	var err error

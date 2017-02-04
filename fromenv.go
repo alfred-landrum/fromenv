@@ -6,18 +6,18 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string  	`fromenv:"FIELD1_KEY,my-default"`
-// 		Field2 int     	`fromenv:"FIELD2_KEY,7"`
-// 		Field3 bool    	`fromenv:"FIELD3_KEY"`
+// 		Field1 string  	`fromenv:"KEY1,my-default"`
+// 		Field2 int     	`fromenv:"KEY2,7"`
+// 		Field3 bool    	`fromenv:"KEY3"`
 // 		Inner struct {
-// 			Field4 string	`fromenv:"FIELD4_KEY"`
+// 			Field4 string	`fromenv:"KEY4"`
 // 		}
 // 	}
 //
-// 	os.Setenv("FIELD1_KEY","foo")
-// 	os.Unsetenv("FIELD2_KEY") // show default usage
-// 	os.Setenv("FIELD3_KEY","true") // or 1, "1", etc.
-// 	os.Setenv("FIELD4_KEY","inner too!")
+// 	os.Setenv("KEY1","foo")
+// 	os.Unsetenv("KEY2") // show default usage
+// 	os.Setenv("KEY3","true") // or 1, "1", etc.
+// 	os.Setenv("KEY4","inner too!")
 //
 // 	err := fromenv.Unmarshal(&c)
 // 	// c.Field1 == "foo"
@@ -25,6 +25,12 @@
 // 	// c.Field3 == true
 // 	// c.Inner.Field4 == "inner too!"
 //
+// 	// Use Map to get values from map[string]string instead:
+// 	m := map[string]string{"KEY1": "bar"}
+// 	err := fromenv.Unmarshal(&c, fromenv.Map(m))
+// 	// c.Field1 == "bar"
+// 	// c.Field2 == 7
+// 	// ...
 package fromenv
 
 import (
@@ -36,10 +42,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-)
-
-var (
-	tagName = "fromenv"
 )
 
 // Unmarshal takes a pointer to a struct, recursively looks for struct
@@ -153,6 +155,8 @@ func osLookup(key string) (val *string, err error) {
 type config struct {
 	looker LookupEnvFunc
 }
+
+const tagName = "fromenv"
 
 // parseTag returns the environment key and possible default value
 // encoded in the field struct tag.
