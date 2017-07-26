@@ -253,7 +253,7 @@ func setValue(value reflect.Value, str string) (err error) {
 		return err
 	}
 
-	return errors.New("unsupported type")
+	return fmt.Errorf("unsupported type: %v", value.Type().String())
 }
 
 type setter interface {

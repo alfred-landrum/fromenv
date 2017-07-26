@@ -98,7 +98,7 @@ func TestTypeLogic(t *testing.T) {
 	}
 	var s3 S3
 	err = Unmarshal(&s3, Map(map[string]string{"k1": "k1-val"}))
-	require.EqualError(t, err, "unsupported type: field Nonsupported (interface) in struct S3")
+	require.EqualError(t, err, "unsupported type: interface {}: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
 		S4Str string `env:"S4Str"`
