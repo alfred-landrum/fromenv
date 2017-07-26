@@ -6,11 +6,11 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string  	`fromenv:"KEY1,my-default"`
-// 		Field2 int     	`fromenv:"KEY2,7"`
-// 		Field3 bool    	`fromenv:"KEY3"`
+// 		Field1 string  	`env:"KEY1=my-default"`
+// 		Field2 int     	`env:"KEY2=7"`
+// 		Field3 bool    	`env:"KEY3"`
 // 		Inner struct {
-// 			Field4 string	`fromenv:"KEY4"`
+// 			Field4 string	`env:"KEY4"`
 // 		}
 // 	}
 //
@@ -35,9 +35,7 @@ package fromenv
 
 import (
 	"errors"
-	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -45,8 +43,8 @@ import (
 )
 
 // Unmarshal takes a pointer to a struct, recursively looks for struct
-// fields with a "fromenv" tag, and sets the field to the value of the
-// environment variable given in the tag. A fromenv tag may optionally
+// fields with a "env" tag, and sets the field to the value of the
+// environment variable given in the tag. An env tag may optionally
 // specify a default value; the field will be set to this value if the
 // environment variable is not present.
 //
@@ -57,8 +55,8 @@ import (
 // Basic types supported are: string, bool, int, uint8, uint16, uint32,
 // uint64, int, int8, int16, int32, int64, float32, float64.
 //
-// Additionally, any type that implements the "flag.Value" interface
-// is also supported. See the "URL" type for an example.
+// Additionally, any type that has a `Set(string) error` method is also
+// supported. This includes any type that satisfies flag.Value.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -72,7 +70,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 	}
 
 	// Visit each struct field reachable from the input interface,
-	// processing any fields with the "fromenv" struct tag.
+	// processing any fields with the "env" struct tag.
 	return visit(in, func(c cursor) error {
 		key, defval := parseTag(c.field)
 		if len(key) == 0 {
@@ -156,13 +154,16 @@ type config struct {
 	looker LookupEnvFunc
 }
 
-const tagName = "fromenv"
+const (
+	tagName = "env"
+	tagSep  = "="
+)
 
 // parseTag returns the environment key and possible default value
 // encoded in the field struct tag.
 func parseTag(field *reflect.StructField) (string, *string) {
 	tag := field.Tag.Get(tagName)
-	s := strings.SplitN(tag, ",", 2)
+	s := strings.SplitN(tag, tagSep, 2)
 	if len(s) == 1 {
 		return s[0], nil
 	}
@@ -222,8 +223,8 @@ func setValue(value reflect.Value, str string) (err error) {
 	}
 
 	// Support the flag package's Value interface of Set(string):
-	if fv, ok := toFlagValue(value); ok {
-		return fv.Set(str)
+	if s, ok := isSetter(value); ok {
+		return s.Set(str)
 	}
 
 	switch value.Kind() {
@@ -252,32 +253,15 @@ func setValue(value reflect.Value, str string) (err error) {
 		return err
 	}
 
-	return errors.New("unsupported type")
+	return fmt.Errorf("unsupported type: %v", value.Type().String())
 }
 
-func toFlagValue(value reflect.Value) (flag.Value, bool) {
+type setter interface {
+	Set(string) error
+}
+
+func isSetter(value reflect.Value) (setter, bool) {
 	i := value.Addr().Interface()
-	fv, ok := i.(flag.Value)
-	return fv, ok
+	s, ok := i.(setter)
+	return s, ok
 }
-
-// URL merely provides a net/url.URL wrapper that matches the flag.Value
-// interface for ease of using with fromenv.
-type URL url.URL
-
-// Set calls url.ParseRequestURI on the input string; on success, this
-// instance is set to the parsed net/url.URL result.
-func (u *URL) Set(s string) error {
-	nu, err := url.ParseRequestURI(s)
-	if err != nil {
-		return err
-	}
-	*u = URL(*nu)
-	return nil
-}
-
-func (u *URL) String() string {
-	return (*url.URL)(u).String()
-}
-
-var _ flag.Value = (*URL)(nil)

@@ -1,11 +1,11 @@
-[![Build Status](https://travis-ci.org/alfred-landrum/fromenv.svg?branch=master)](https://travis-ci.org/alfred-landrum/fromenv)
-[![codecov](https://codecov.io/gh/alfred-landrum/fromenv/branch/master/graph/badge.svg)](https://codecov.io/gh/alfred-landrum/fromenv)
+
 
 # fromenv
 `import "github.com/alfred-landrum/fromenv"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
+* [Subdirectories](#pkg-subdirectories)
 
 ## <a name="pkg-overview">Overview</a>
 Package fromenv can set specially tagged struct fields with values
@@ -13,26 +13,25 @@ from the environment.
 
 
 	var c struct {
-		Field1 string  	`fromenv:"KEY1,my-default"`
-		Field2 int     	`fromenv:"KEY2,7"`
-		Field3 bool    	`fromenv:"KEY3"`
-
+		Field1 string  	`env:"KEY1=my-default"`
+		Field2 int     	`env:"KEY2=7"`
+		Field3 bool    	`env:"KEY3"`
 		Inner struct {
-			Field4 string	`fromenv:"KEY4"`
+			Field4 string	`env:"KEY4"`
 		}
 	}
-
+	
 	os.Setenv("KEY1","foo")
 	os.Unsetenv("KEY2") // show default usage
 	os.Setenv("KEY3","true") // or 1, "1", etc.
 	os.Setenv("KEY4","inner too!")
-
+	
 	err := fromenv.Unmarshal(&c)
 	// c.Field1 == "foo"
 	// c.Field2 == 7
 	// c.Field3 == true
 	// c.Inner.Field4 == "inner too!"
-
+	
 	// Use Map to get values from map[string]string instead:
 	m := map[string]string{"KEY1": "bar"}
 	err := fromenv.Unmarshal(&c, fromenv.Map(m))
@@ -50,25 +49,22 @@ from the environment.
   * [func DefaultsOnly() Option](#DefaultsOnly)
   * [func Looker(f LookupEnvFunc) Option](#Looker)
   * [func Map(m map[string]string) Option](#Map)
-* [type URL](#URL)
-  * [func (u *URL) Set(s string) error](#URL.Set)
-  * [func (u *URL) String() string](#URL.String)
 
 
 #### <a name="pkg-files">Package files</a>
-[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go)
+[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) 
 
 
 
 
 
-## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1837:1892#L52)
+## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1805:1860#L50)
 ``` go
 func Unmarshal(in interface{}, options ...Option) error
 ```
 Unmarshal takes a pointer to a struct, recursively looks for struct
-fields with a "fromenv" tag, and sets the field to the value of the
-environment variable given in the tag. A fromenv tag may optionally
+fields with a "env" tag, and sets the field to the value of the
+environment variable given in the tag. An env tag may optionally
 specify a default value; the field will be set to this value if the
 environment variable is not present.
 
@@ -79,13 +75,13 @@ different lookup technique.
 Basic types supported are: string, bool, int, uint8, uint16, uint32,
 uint64, int, int8, int16, int32, int64, float32, float64.
 
-Additionally, any type that implements the "flag.Value" interface
-is also supported. See the "URL" type for an example.
+Additionally, any type that has a `Set(string) error` method is also
+supported. This includes any type that satisfies flag.Value.
 
 
 
 
-## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2919:2981#L101)
+## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2883:2945#L99)
 ``` go
 type LookupEnvFunc func(key string) (value *string, err error)
 ```
@@ -102,7 +98,7 @@ is returned.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=3635:3660#L128)
+## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=3599:3624#L126)
 ``` go
 type Option func(*config)
 ```
@@ -114,7 +110,7 @@ An Option is a functional option for Unmarshal.
 
 
 
-### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3535:3561#L123)
+### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3499:3525#L121)
 ``` go
 func DefaultsOnly() Option
 ```
@@ -122,7 +118,7 @@ DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 default to that default, ignoring other fields and the environment.
 
 
-### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3070:3105#L105)
+### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3034:3069#L103)
 ``` go
 func Looker(f LookupEnvFunc) Option
 ```
@@ -130,46 +126,13 @@ Looker configures the environment lookup function used during an
 Unmarshal call.
 
 
-### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3229:3265#L112)
+### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3193:3229#L110)
 ``` go
 func Map(m map[string]string) Option
 ```
 Map configures Unmarshal to use the given map for environment lookups.
 
 
-
-
-
-## <a name="URL">type</a> [URL](/src/target/fromenv.go?s=6535:6551#L256)
-``` go
-type URL url.URL
-```
-URL merely provides a net/url.URL wrapper that matches the flag.Value
-interface for ease of using with fromenv.
-
-
-
-
-
-
-
-
-
-
-### <a name="URL.Set">func</a> (\*URL) [Set](/src/target/fromenv.go?s=6677:6710#L260)
-``` go
-func (u *URL) Set(s string) error
-```
-Set calls url.ParseRequestURI on the input string; on success, this
-instance is set to the parsed net/url.URL result.
-
-
-
-
-### <a name="URL.String">func</a> (\*URL) [String](/src/target/fromenv.go?s=6811:6840#L269)
-``` go
-func (u *URL) String() string
-```
 
 
 

@@ -7,7 +7,6 @@ package fromenv
 import (
 	"errors"
 	"os"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,7 +25,7 @@ func TestLookupConfig(t *testing.T) {
 	var err error
 
 	type S2 struct {
-		Str1 string `fromenv:"k1,Str1-default"`
+		Str1 string `env:"k1=Str1-default"`
 	}
 	var s2 S2
 	err = Unmarshal(&s2, DefaultsOnly())
@@ -34,7 +33,7 @@ func TestLookupConfig(t *testing.T) {
 	require.Equal(t, "Str1-default", s2.Str1)
 
 	type S3 struct {
-		Str1 string `fromenv:"k1"`
+		Str1 string `env:"k1"`
 	}
 	var s3 S3
 	badlookup := func(k string) (*string, error) {
@@ -54,7 +53,7 @@ func TestVisitLoop(t *testing.T) {
 	}
 
 	type S struct {
-		Str1 string `fromenv:"k1"`
+		Str1 string `env:"k1"`
 		Sp   *S
 	}
 
@@ -88,24 +87,24 @@ func TestTypeLogic(t *testing.T) {
 	require.NoError(t, err)
 
 	type S2 struct {
-		nonexported int `fromenv:"k1"`
+		nonexported int `env:"k1"`
 	}
 	var s2 S2
 	err = Unmarshal(&s2, Map(map[string]string{"k1": "k1-val"}))
 	require.EqualError(t, err, "unsettable field: field nonexported (int) in struct S2")
 
 	type S3 struct {
-		Nonsupported interface{} `fromenv:"k1"`
+		Nonsupported interface{} `env:"k1"`
 	}
 	var s3 S3
 	err = Unmarshal(&s3, Map(map[string]string{"k1": "k1-val"}))
-	require.EqualError(t, err, "unsupported type: field Nonsupported (interface) in struct S3")
+	require.EqualError(t, err, "unsupported type: interface {}: field Nonsupported (interface) in struct S3")
 
 	type S4 struct {
-		S4Str string `fromenv:"S4Str"`
+		S4Str string `env:"S4Str"`
 	}
 	type S5 struct {
-		S5Str string `fromenv:"S5Str"`
+		S5Str string `env:"S5Str"`
 	}
 	type S6 struct {
 		S4       S4
@@ -127,10 +126,10 @@ func TestTypeLogic(t *testing.T) {
 	require.Nil(t, s6.S5nilptr)
 
 	type S7 struct {
-		S7str string `fromenv:"S7str,S7default"`
+		S7str string `env:"S7str=S7default"`
 	}
 	type S8 struct {
-		S8str string `fromenv:"S8str,S8default"`
+		S8str string `env:"S8str=S8default"`
 		S7    S7
 	}
 	type S9 struct {
@@ -161,8 +160,8 @@ func TestRealEnvironment(t *testing.T) {
 
 	var err error
 	type S struct {
-		Str1 string `fromenv:"fromenv_test_key1"`
-		Str2 string `fromenv:"fromenv_test_key2,str2-def"`
+		Str1 string `env:"fromenv_test_key1"`
+		Str2 string `env:"fromenv_test_key2=str2-def"`
 	}
 
 	unsetKeys()
@@ -190,7 +189,7 @@ func TestString(t *testing.T) {
 	}
 
 	type S1 struct {
-		Str1 string `fromenv:"k1"`
+		Str1 string `env:"k1"`
 	}
 
 	var s1 S1
@@ -199,7 +198,7 @@ func TestString(t *testing.T) {
 	require.Equal(t, "k1-val", s1.Str1)
 
 	type S2 struct {
-		Str1 string `fromenv:"k1,not-used-default"`
+		Str1 string `env:"k1=not-used-default"`
 	}
 
 	var s2 S2
@@ -208,13 +207,13 @@ func TestString(t *testing.T) {
 	require.Equal(t, "k1-val", s2.Str1)
 
 	type S3 struct {
-		Str1 string `fromenv:"nokey,def-val,with-comma"`
+		Str1 string `env:"nokey=def-val=with-sep"`
 	}
 
 	var s3 S3
 	err = Unmarshal(&s3, Map(env))
 	require.NoError(t, err)
-	require.Equal(t, "def-val,with-comma", s3.Str1)
+	require.Equal(t, "def-val=with-sep", s3.Str1)
 }
 
 func TestInt(t *testing.T) {
@@ -226,7 +225,7 @@ func TestInt(t *testing.T) {
 	}
 
 	type S1 struct {
-		Int1 int `fromenv:"k1"`
+		Int1 int `env:"k1"`
 	}
 
 	var s1 S1
@@ -235,7 +234,7 @@ func TestInt(t *testing.T) {
 	require.Equal(t, int(1), s1.Int1)
 
 	type S2 struct {
-		Int2 int `fromenv:"k2"`
+		Int2 int `env:"k2"`
 	}
 
 	var s2 S2
@@ -252,7 +251,7 @@ func TestUint(t *testing.T) {
 	}
 
 	type S1 struct {
-		Uint1 uint `fromenv:"k1"`
+		Uint1 uint `env:"k1"`
 	}
 
 	var s1 S1
@@ -261,7 +260,7 @@ func TestUint(t *testing.T) {
 	require.Equal(t, uint(1), s1.Uint1)
 
 	type S2 struct {
-		Uint2 uint `fromenv:"k2"`
+		Uint2 uint `env:"k2"`
 	}
 
 	var s2 S2
@@ -278,7 +277,7 @@ func TestFloat(t *testing.T) {
 	}
 
 	type S1 struct {
-		F1 float64 `fromenv:"k1"`
+		F1 float64 `env:"k1"`
 	}
 
 	var s1 S1
@@ -287,7 +286,7 @@ func TestFloat(t *testing.T) {
 	require.Equal(t, float64(1.5), s1.F1)
 
 	type S2 struct {
-		F2 float64 `fromenv:"k2"`
+		F2 float64 `env:"k2"`
 	}
 
 	var s2 S2
@@ -304,7 +303,7 @@ func TestBool(t *testing.T) {
 	}
 
 	type S1 struct {
-		Bool1 bool `fromenv:"k1"`
+		Bool1 bool `env:"k1"`
 	}
 
 	var s1 S1
@@ -313,7 +312,7 @@ func TestBool(t *testing.T) {
 	require.True(t, s1.Bool1)
 
 	type S2 struct {
-		Bool2 bool `fromenv:"k2"`
+		Bool2 bool `env:"k2"`
 	}
 
 	var s2 S2
@@ -321,20 +320,16 @@ func TestBool(t *testing.T) {
 	require.EqualError(t, err, "strconv.ParseBool: parsing \"i-am-not-a-bool\": invalid syntax: field Bool2 (bool) in struct S2")
 }
 
-type testFlagValue struct {
+type testSetIface struct {
 	x bool
 }
 
-func (tfv *testFlagValue) Set(s string) error {
+func (tfv *testSetIface) Set(s string) error {
 	if s == "a-setter" {
 		tfv.x = true
 		return nil
 	}
 	return errors.New("not-a-setter")
-}
-
-func (tfv *testFlagValue) String() string {
-	return strconv.FormatBool(tfv.x)
 }
 
 func TestSetter(t *testing.T) {
@@ -347,45 +342,19 @@ func TestSetter(t *testing.T) {
 	type testSetter struct{}
 
 	type S1 struct {
-		TFV testFlagValue `fromenv:"k1"`
+		TSI testSetIface `env:"k1"`
 	}
 
 	var s1 S1
 	err := Unmarshal(&s1, Map(env))
 	require.NoError(t, err)
-	require.True(t, s1.TFV.x)
+	require.True(t, s1.TSI.x)
 
 	type S2 struct {
-		TFV testFlagValue `fromenv:"k2"`
+		TSI testSetIface `env:"k2"`
 	}
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "not-a-setter: field TFV (struct) in struct S2")
-}
-
-func TestURL(t *testing.T) {
-	t.Parallel()
-
-	env := map[string]string{
-		"k1": "https://docker.com/path/foo",
-		"k2": "not-a-url",
-	}
-
-	type S1 struct {
-		U URL `fromenv:"k1"`
-	}
-
-	var s1 S1
-	err := Unmarshal(&s1, Map(env))
-	require.NoError(t, err)
-	require.Equal(t, env["k1"], s1.U.String())
-
-	type S2 struct {
-		U URL `fromenv:"k2"`
-	}
-
-	var s2 S2
-	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "parse not-a-url: invalid URI for request: field U (struct) in struct S2")
+	require.EqualError(t, err, "not-a-setter: field TSI (struct) in struct S2")
 }
