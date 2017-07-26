@@ -6,11 +6,11 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string  	`fromenv:"KEY1,my-default"`
-// 		Field2 int     	`fromenv:"KEY2,7"`
-// 		Field3 bool    	`fromenv:"KEY3"`
+// 		Field1 string  	`env:"KEY1,my-default"`
+// 		Field2 int     	`env:"KEY2,7"`
+// 		Field3 bool    	`env:"KEY3"`
 // 		Inner struct {
-// 			Field4 string	`fromenv:"KEY4"`
+// 			Field4 string	`env:"KEY4"`
 // 		}
 // 	}
 //
@@ -45,8 +45,8 @@ import (
 )
 
 // Unmarshal takes a pointer to a struct, recursively looks for struct
-// fields with a "fromenv" tag, and sets the field to the value of the
-// environment variable given in the tag. A fromenv tag may optionally
+// fields with a "env" tag, and sets the field to the value of the
+// environment variable given in the tag. An env tag may optionally
 // specify a default value; the field will be set to this value if the
 // environment variable is not present.
 //
@@ -72,7 +72,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 	}
 
 	// Visit each struct field reachable from the input interface,
-	// processing any fields with the "fromenv" struct tag.
+	// processing any fields with the "env" struct tag.
 	return visit(in, func(c cursor) error {
 		key, defval := parseTag(c.field)
 		if len(key) == 0 {
@@ -156,7 +156,7 @@ type config struct {
 	looker LookupEnvFunc
 }
 
-const tagName = "fromenv"
+const tagName = "env"
 
 // parseTag returns the environment key and possible default value
 // encoded in the field struct tag.
