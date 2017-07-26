@@ -35,7 +35,6 @@ package fromenv
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"reflect"
@@ -56,8 +55,8 @@ import (
 // Basic types supported are: string, bool, int, uint8, uint16, uint32,
 // uint64, int, int8, int16, int32, int64, float32, float64.
 //
-// Additionally, any type that implements the "flag.Value" interface
-// is also supported.
+// Additionally, any type that has a `Set(string) error` method is also
+// supported. This includes any type that satisfies flag.Value.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -224,8 +223,8 @@ func setValue(value reflect.Value, str string) (err error) {
 	}
 
 	// Support the flag package's Value interface of Set(string):
-	if fv, ok := toFlagValue(value); ok {
-		return fv.Set(str)
+	if s, ok := isSetter(value); ok {
+		return s.Set(str)
 	}
 
 	switch value.Kind() {
@@ -257,8 +256,12 @@ func setValue(value reflect.Value, str string) (err error) {
 	return errors.New("unsupported type")
 }
 
-func toFlagValue(value reflect.Value) (flag.Value, bool) {
+type setter interface {
+	Set(string) error
+}
+
+func isSetter(value reflect.Value) (setter, bool) {
 	i := value.Addr().Interface()
-	fv, ok := i.(flag.Value)
-	return fv, ok
+	s, ok := i.(setter)
+	return s, ok
 }
