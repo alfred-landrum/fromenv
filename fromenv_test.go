@@ -363,29 +363,3 @@ func TestSetter(t *testing.T) {
 	err = Unmarshal(&s2, Map(env))
 	require.EqualError(t, err, "not-a-setter: field TFV (struct) in struct S2")
 }
-
-func TestURL(t *testing.T) {
-	t.Parallel()
-
-	env := map[string]string{
-		"k1": "https://docker.com/path/foo",
-		"k2": "not-a-url",
-	}
-
-	type S1 struct {
-		U URL `env:"k1"`
-	}
-
-	var s1 S1
-	err := Unmarshal(&s1, Map(env))
-	require.NoError(t, err)
-	require.Equal(t, env["k1"], s1.U.String())
-
-	type S2 struct {
-		U URL `env:"k2"`
-	}
-
-	var s2 S2
-	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "parse not-a-url: invalid URI for request: field U (struct) in struct S2")
-}

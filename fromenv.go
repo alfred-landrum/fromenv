@@ -37,7 +37,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -58,7 +57,7 @@ import (
 // uint64, int, int8, int16, int32, int64, float32, float64.
 //
 // Additionally, any type that implements the "flag.Value" interface
-// is also supported. See the "URL" type for an example.
+// is also supported.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -260,24 +259,3 @@ func toFlagValue(value reflect.Value) (flag.Value, bool) {
 	fv, ok := i.(flag.Value)
 	return fv, ok
 }
-
-// URL merely provides a net/url.URL wrapper that matches the flag.Value
-// interface for ease of using with fromenv.
-type URL url.URL
-
-// Set calls url.ParseRequestURI on the input string; on success, this
-// instance is set to the parsed net/url.URL result.
-func (u *URL) Set(s string) error {
-	nu, err := url.ParseRequestURI(s)
-	if err != nil {
-		return err
-	}
-	*u = URL(*nu)
-	return nil
-}
-
-func (u *URL) String() string {
-	return (*url.URL)(u).String()
-}
-
-var _ flag.Value = (*URL)(nil)
