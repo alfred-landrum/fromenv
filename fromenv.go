@@ -6,8 +6,8 @@
 // from the environment.
 //
 //	var c struct {
-// 		Field1 string  	`env:"KEY1,my-default"`
-// 		Field2 int     	`env:"KEY2,7"`
+// 		Field1 string  	`env:"KEY1=my-default"`
+// 		Field2 int     	`env:"KEY2=7"`
 // 		Field3 bool    	`env:"KEY3"`
 // 		Inner struct {
 // 			Field4 string	`env:"KEY4"`
@@ -155,13 +155,16 @@ type config struct {
 	looker LookupEnvFunc
 }
 
-const tagName = "env"
+const (
+	tagName = "env"
+	tagSep  = "="
+)
 
 // parseTag returns the environment key and possible default value
 // encoded in the field struct tag.
 func parseTag(field *reflect.StructField) (string, *string) {
 	tag := field.Tag.Get(tagName)
-	s := strings.SplitN(tag, ",", 2)
+	s := strings.SplitN(tag, tagSep, 2)
 	if len(s) == 1 {
 		return s[0], nil
 	}

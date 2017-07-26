@@ -26,7 +26,7 @@ func TestLookupConfig(t *testing.T) {
 	var err error
 
 	type S2 struct {
-		Str1 string `env:"k1,Str1-default"`
+		Str1 string `env:"k1=Str1-default"`
 	}
 	var s2 S2
 	err = Unmarshal(&s2, DefaultsOnly())
@@ -127,10 +127,10 @@ func TestTypeLogic(t *testing.T) {
 	require.Nil(t, s6.S5nilptr)
 
 	type S7 struct {
-		S7str string `env:"S7str,S7default"`
+		S7str string `env:"S7str=S7default"`
 	}
 	type S8 struct {
-		S8str string `env:"S8str,S8default"`
+		S8str string `env:"S8str=S8default"`
 		S7    S7
 	}
 	type S9 struct {
@@ -162,7 +162,7 @@ func TestRealEnvironment(t *testing.T) {
 	var err error
 	type S struct {
 		Str1 string `env:"fromenv_test_key1"`
-		Str2 string `env:"fromenv_test_key2,str2-def"`
+		Str2 string `env:"fromenv_test_key2=str2-def"`
 	}
 
 	unsetKeys()
@@ -199,7 +199,7 @@ func TestString(t *testing.T) {
 	require.Equal(t, "k1-val", s1.Str1)
 
 	type S2 struct {
-		Str1 string `env:"k1,not-used-default"`
+		Str1 string `env:"k1=not-used-default"`
 	}
 
 	var s2 S2
@@ -208,13 +208,13 @@ func TestString(t *testing.T) {
 	require.Equal(t, "k1-val", s2.Str1)
 
 	type S3 struct {
-		Str1 string `env:"nokey,def-val,with-comma"`
+		Str1 string `env:"nokey=def-val=with-sep"`
 	}
 
 	var s3 S3
 	err = Unmarshal(&s3, Map(env))
 	require.NoError(t, err)
-	require.Equal(t, "def-val,with-comma", s3.Str1)
+	require.Equal(t, "def-val=with-sep", s3.Str1)
 }
 
 func TestInt(t *testing.T) {
