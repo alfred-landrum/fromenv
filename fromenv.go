@@ -42,6 +42,16 @@ import (
 	"strings"
 )
 
+type unmarshalError struct {
+	err error
+	cursor cursor
+}
+
+func (e *unmarshalError) Error() string {
+	return fmt.Sprintf("%s: field %v (%v) in struct %v", e.err.Error(),
+		e.cursor.field.Name, e.cursor.value.Kind().String(), e.cursor.structType.Name())
+}
+
 // Unmarshal takes a pointer to a struct, recursively looks for struct
 // fields with a "env" tag, and sets the field to the value of the
 // environment variable given in the tag. An env tag may optionally
@@ -79,7 +89,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 		val, err := config.looker(key)
 		if err != nil {
-			goto reterr
+			return &unmarshalError{err, c}
 		}
 
 		if val == nil {
@@ -91,15 +101,10 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 		err = setValue(c.value, *val)
 		if err != nil {
-			goto reterr
+			return &unmarshalError{err, c}
 		}
 
 		return nil
-
-	reterr:
-		err = fmt.Errorf("%s: field %v (%v) in struct %v", err.Error(),
-			c.field.Name, c.value.Kind().String(), c.structType.Name())
-		return err
 	})
 }
 
