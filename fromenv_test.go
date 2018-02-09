@@ -6,8 +6,10 @@ package fromenv
 
 import (
 	"errors"
+	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -329,7 +331,7 @@ func (tfv *testSetIface) Set(s string) error {
 		tfv.x = true
 		return nil
 	}
-	return errors.New("not-a-setter")
+	return errors.New("a-failing-setter")
 }
 
 func TestSetter(t *testing.T) {
@@ -339,7 +341,6 @@ func TestSetter(t *testing.T) {
 		"k1": "a-setter",
 		"k2": "not-a-setter",
 	}
-	type testSetter struct{}
 
 	type S1 struct {
 		TSI testSetIface `env:"k1"`
@@ -356,5 +357,57 @@ func TestSetter(t *testing.T) {
 
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "not-a-setter: field TSI (struct) in struct S2")
+	require.EqualError(t, err, "a-failing-setter: field TSI (struct) in struct S2")
+}
+
+func TestURL(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"k1": "http://www.sysdig.com",
+		"k2": "not-a-url",
+	}
+
+	type S1 struct {
+		U URL `env:"k1"`
+	}
+
+	var s1 S1
+	err := Unmarshal(&s1, Map(env))
+	require.NoError(t, err)
+	require.Equal(t, (*url.URL)(&s1.U).String(), env["k1"])
+
+	type S2 struct {
+		U URL `env:"k2"`
+	}
+
+	var s2 S2
+	err = Unmarshal(&s2, Map(env))
+	require.EqualError(t, err, "parse not-a-url: invalid URI for request: field U (struct) in struct S2")
+}
+
+func TestDuration(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"k1": "5s",
+		"k2": "not-a-duration",
+	}
+
+	type S1 struct {
+		D Duration `env:"k1"`
+	}
+
+	var s1 S1
+	err := Unmarshal(&s1, Map(env))
+	require.NoError(t, err)
+	require.Equal(t, time.Duration(s1.D), 5*time.Second)
+
+	type S2 struct {
+		D Duration `env:"k2"`
+	}
+
+	var s2 S2
+	err = Unmarshal(&s2, Map(env))
+	require.EqualError(t, err, "time: invalid duration not-a-duration: field D (int64) in struct S2")
 }

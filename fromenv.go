@@ -36,14 +36,16 @@ package fromenv
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type unmarshalError struct {
-	err error
+	err    error
 	cursor cursor
 }
 
@@ -66,7 +68,7 @@ func (e *unmarshalError) Error() string {
 // uint64, int, int8, int16, int32, int64, float32, float64.
 //
 // Additionally, any type that has a `Set(string) error` method is also
-// supported. This includes any type that satisfies flag.Value.
+// supported.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -227,7 +229,7 @@ func setValue(value reflect.Value, str string) (err error) {
 		return errors.New("unsettable field")
 	}
 
-	// Support the flag package's Value interface of Set(string):
+	// Check for an interface of `Set(string) error`.
 	if s, ok := isSetter(value); ok {
 		return s.Set(str)
 	}
@@ -269,4 +271,27 @@ func isSetter(value reflect.Value) (setter, bool) {
 	i := value.Addr().Interface()
 	s, ok := i.(setter)
 	return s, ok
+}
+
+// URL is a convenience type to set a net/url.URL.
+type URL url.URL
+
+// Set via ParseRequestURI.
+func (u *URL) Set(s string) error {
+	x, err := url.ParseRequestURI(s)
+	if err != nil {
+		return err
+	}
+	*u = URL(*x)
+	return err
+}
+
+// Duration is a convenience type to set a time.Duration.
+type Duration time.Duration
+
+// Set via ParseDuration.
+func (d *Duration) Set(s string) error {
+	x, err := time.ParseDuration(s)
+	*d = (Duration)(x)
+	return err
 }
