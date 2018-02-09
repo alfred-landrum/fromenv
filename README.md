@@ -44,11 +44,15 @@ from the environment.
 
 ## <a name="pkg-index">Index</a>
 * [func Unmarshal(in interface{}, options ...Option) error](#Unmarshal)
+* [type Duration](#Duration)
+  * [func (d *Duration) Set(s string) error](#Duration.Set)
 * [type LookupEnvFunc](#LookupEnvFunc)
 * [type Option](#Option)
   * [func DefaultsOnly() Option](#DefaultsOnly)
   * [func Looker(f LookupEnvFunc) Option](#Looker)
   * [func Map(m map[string]string) Option](#Map)
+* [type URL](#URL)
+  * [func (u *URL) Set(s string) error](#URL.Set)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -58,7 +62,7 @@ from the environment.
 
 
 
-## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1805:1860#L50)
+## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=2032:2087#L62)
 ``` go
 func Unmarshal(in interface{}, options ...Option) error
 ```
@@ -76,12 +80,36 @@ Basic types supported are: string, bool, int, uint8, uint16, uint32,
 uint64, int, int8, int16, int32, int64, float32, float64.
 
 Additionally, any type that has a `Set(string) error` method is also
-supported. This includes any type that satisfies flag.Value.
+supported.
 
 
 
 
-## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2883:2945#L99)
+## <a name="Duration">type</a> [Duration](/src/target/fromenv.go?s=6843:6870#L280)
+``` go
+type Duration time.Duration
+```
+Duration is a convenience type to set a time.Duration.
+
+
+
+
+
+
+
+
+
+
+### <a name="Duration.Set">func</a> (\*Duration) [Set](/src/target/fromenv.go?s=6898:6936#L283)
+``` go
+func (d *Duration) Set(s string) error
+```
+Set via ParseDuration.
+
+
+
+
+## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2996:3058#L106)
 ``` go
 type LookupEnvFunc func(key string) (value *string, err error)
 ```
@@ -98,7 +126,7 @@ is returned.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=3599:3624#L126)
+## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=3712:3737#L133)
 ``` go
 type Option func(*config)
 ```
@@ -110,7 +138,7 @@ An Option is a functional option for Unmarshal.
 
 
 
-### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3499:3525#L121)
+### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3612:3638#L128)
 ``` go
 func DefaultsOnly() Option
 ```
@@ -118,7 +146,7 @@ DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 default to that default, ignoring other fields and the environment.
 
 
-### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3034:3069#L103)
+### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3147:3182#L110)
 ``` go
 func Looker(f LookupEnvFunc) Option
 ```
@@ -126,12 +154,36 @@ Looker configures the environment lookup function used during an
 Unmarshal call.
 
 
-### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3193:3229#L110)
+### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3306:3342#L117)
 ``` go
 func Map(m map[string]string) Option
 ```
 Map configures Unmarshal to use the given map for environment lookups.
 
+
+
+
+
+## <a name="URL">type</a> [URL](/src/target/fromenv.go?s=6607:6623#L267)
+``` go
+type URL url.URL
+```
+URL is a convenience type to set a net/url.URL.
+
+
+
+
+
+
+
+
+
+
+### <a name="URL.Set">func</a> (\*URL) [Set](/src/target/fromenv.go?s=6653:6686#L270)
+``` go
+func (u *URL) Set(s string) error
+```
+Set via ParseRequestURI.
 
 
 
