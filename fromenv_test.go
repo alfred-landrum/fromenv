@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -356,4 +357,82 @@ func TestSetter(t *testing.T) {
 	var s2 S2
 	err = Unmarshal(&s2, Map(env))
 	require.EqualError(t, err, "a-failing-setter: field TSI (struct) in struct S2")
+}
+
+func TestSetFunc(t *testing.T) {
+	t.Parallel()
+
+	t.Run("badfuncs", func(t *testing.T) {
+		t.Parallel()
+
+		badfuncs := []interface{}{
+			"hello",
+			func() {},
+			func(x int) {},
+			func(x int) error { return nil },
+			func(x int, y string) error { return nil },
+			func(x *int, y int) error { return nil },
+			func(x *int, y string) int { return 0 },
+		}
+		b0 := struct{}{}
+		for i := range badfuncs {
+			require.Panics(t, func() { Unmarshal(&b0, SetFunc(badfuncs[i])) })
+		}
+	})
+
+	t.Run("simple", func(t *testing.T) {
+		t.Parallel()
+
+		durSetter := func(d *time.Duration, s string) error {
+			x, err := time.ParseDuration(s)
+			*d = x
+			return err
+		}
+
+		env := map[string]string{
+			"k1": "5s",
+			"k2": "not-a-duration",
+		}
+
+		type S1 struct {
+			D time.Duration `env:"k1"`
+		}
+
+		var s1 S1
+		err := Unmarshal(&s1, Map(env), SetFunc(durSetter))
+		require.NoError(t, err)
+		require.Equal(t, s1.D, 5*time.Second)
+
+		type S2 struct {
+			D time.Duration `env:"k2"`
+		}
+
+		var s2 S2
+		err = Unmarshal(&s2, Map(env), SetFunc(durSetter))
+		require.EqualError(t, err, "time: invalid duration not-a-duration: field D (int64) in struct S2")
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		t.Parallel()
+
+		durSetter := func(d *time.Duration, s string) error {
+			x, err := time.ParseDuration(s)
+			*d = x
+			return err
+		}
+
+		env := map[string]string{
+			"k1": "5s",
+		}
+
+		type S1 struct {
+			D *time.Duration `env:"k1"`
+		}
+
+		var s1 S1
+		err := Unmarshal(&s1, Map(env), SetFunc(durSetter))
+		require.NoError(t, err)
+		require.Equal(t, *s1.D, 5*time.Second)
+	})
+
 }

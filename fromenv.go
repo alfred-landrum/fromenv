@@ -25,12 +25,33 @@
 // 	// c.Field3 == true
 // 	// c.Inner.Field4 == "inner too!"
 //
-// 	// Use Map to get values from map[string]string instead:
+// 	Use Map to get values from map[string]string instead:
+//
 // 	m := map[string]string{"KEY1": "bar"}
 // 	err := fromenv.Unmarshal(&c, fromenv.Map(m))
 // 	// c.Field1 == "bar"
 // 	// c.Field2 == 7
 // 	// ...
+//
+// Supply a setter function to handle your own types:
+//
+// timeSetter := func(t *time.Time, s string) error {
+// 	x, err := time.Parse(time.RFC3339, s)
+// 	*t = x
+// 	return err
+// }
+// urlSetter := func(u *url.URL, s string) error {
+// 	x, err := url.Parse(s)
+// 	*u = *x
+// 	return err
+// }
+//
+//  type config struct {
+// 	theTime  time.Time `env:"TIME"`
+// 	thePlace *url.URL  `env:"PLACE"`
+// }
+// var c config
+// err := Unmarshal(&c, Map(env), SetFunc(timeSetter), SetFunc(urlSetter))
 package fromenv
 
 import (
@@ -62,11 +83,11 @@ func (e *unmarshalError) Error() string {
 // for an environment variable. See "Map" for an example of using a
 // different lookup technique.
 //
-// Basic types supported are: string, bool, int, uint8, uint16, uint32,
+// A type T can be set if:
+// - A function of "func(*T, string) error" been configured via the SetFunc option.
+// - Type T implements a `func (T*) Set(string) error` method
+// - It's one of the simple types: string, bool, int, uint8, uint16, uint32,
 // uint64, int, int8, int16, int32, int64, float32, float64.
-//
-// Additionally, any type that has a `Set(string) error` method is also
-// supported.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -99,7 +120,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 			val = defval
 		}
 
-		err = setValue(c.value, *val)
+		err = setValue(config, c.value, *val)
 		if err != nil {
 			return &unmarshalError{err, c}
 		}
@@ -137,6 +158,61 @@ func DefaultsOnly() Option {
 	return Map(nil)
 }
 
+type setFunc func(val reflect.Value, s string) error
+
+// validateSetFunc returns ok if fn is a "func(*T, string) error", returning
+// reflect.Type T and the equivalent of fn that takes a reflect.Value of type T.
+func validateSetFunc(fn interface{}) (argType reflect.Type, setFn setFunc, ok bool) {
+	fnValue := reflect.ValueOf(fn)
+	if fnValue.Kind() != reflect.Func {
+		return
+	}
+	fnType := fnValue.Type()
+	if !(fnType.NumIn() == 2 && !fnType.IsVariadic() && fnType.NumOut() == 1) {
+		return
+	}
+	a0 := fnType.In(0)
+	if a0.Kind() != reflect.Ptr {
+		return
+	}
+
+	if fnType.In(1) != reflect.TypeOf((*string)(nil)).Elem() {
+		return
+	}
+
+	errIface := reflect.TypeOf((*error)(nil)).Elem()
+	if !fnType.Out(0).Implements(errIface) {
+		return
+	}
+
+	argType = a0.Elem()
+	setFn = func(val reflect.Value, s string) error {
+		rets := fnValue.Call([]reflect.Value{val.Addr(), reflect.ValueOf(s)})
+		if rets[0].IsNil() {
+			return nil
+		}
+		return rets[0].Interface().(error)
+	}
+
+	return argType, setFn, true
+}
+
+// SetFunc takes a function of form "func(*T, string) error", and configures
+// Unmarshal to use that function to set the value of any type T's.
+func SetFunc(fn interface{}) Option {
+	return func(c *config) {
+		argType, setFn, ok := validateSetFunc(fn)
+		if !ok {
+			panic("expected a function matching: func(*T, string) error")
+		}
+
+		if c.setFuncs == nil {
+			c.setFuncs = make(map[reflect.Type]setFunc)
+		}
+		c.setFuncs[argType] = setFn
+	}
+}
+
 // An Option is a functional option for Unmarshal.
 type Option func(*config)
 
@@ -156,7 +232,8 @@ func osLookup(key string) (val *string, err error) {
 }
 
 type config struct {
-	looker LookupEnvFunc
+	looker   LookupEnvFunc
+	setFuncs map[reflect.Type]setFunc
 }
 
 const (
@@ -222,12 +299,22 @@ func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 }
 
 // Set the struct field at the cursor to the given string.
-func setValue(value reflect.Value, str string) (err error) {
+func setValue(cfg *config, value reflect.Value, str string) (err error) {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		value = value.Elem()
+	}
+
 	if !value.CanSet() {
 		return errors.New("unsettable field")
 	}
 
-	// Check for an interface of `Set(string) error`.
+	if setfn, ok := cfg.setFuncs[value.Type()]; ok {
+		return setfn(value, str)
+	}
+
 	if s, ok := isSetter(value); ok {
 		return s.Set(str)
 	}
