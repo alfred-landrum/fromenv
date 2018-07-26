@@ -36,12 +36,10 @@ package fromenv
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type unmarshalError struct {
@@ -271,27 +269,4 @@ func isSetter(value reflect.Value) (setter, bool) {
 	i := value.Addr().Interface()
 	s, ok := i.(setter)
 	return s, ok
-}
-
-// URL is a convenience type to set a net/url.URL.
-type URL url.URL
-
-// Set via ParseRequestURI.
-func (u *URL) Set(s string) error {
-	x, err := url.ParseRequestURI(s)
-	if err != nil {
-		return err
-	}
-	*u = URL(*x)
-	return err
-}
-
-// Duration is a convenience type to set a time.Duration.
-type Duration time.Duration
-
-// Set via ParseDuration.
-func (d *Duration) Set(s string) error {
-	x, err := time.ParseDuration(s)
-	*d = (Duration)(x)
-	return err
 }
