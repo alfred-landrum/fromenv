@@ -5,68 +5,12 @@
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
+* [Examples](#pkg-examples)
 * [Subdirectories](#pkg-subdirectories)
 
 ## <a name="pkg-overview">Overview</a>
-Package fromenv can set specially tagged struct fields with values
-from the environment.
-
-
-	var c struct {
-		Field1 string  	`env:"KEY1=my-default"`
-		Field2 int     	`env:"KEY2=7"`
-		Field3 bool    	`env:"KEY3"`
-		Inner struct {
-			Field4 string	`env:"KEY4"`
-		}
-	}
-	
-	os.Setenv("KEY1","foo")
-	os.Unsetenv("KEY2") // show default usage
-	os.Setenv("KEY3","true") // or 1, "1", etc.
-	os.Setenv("KEY4","inner too!")
-	
-	err := fromenv.Unmarshal(&c)
-	// c.Field1 == "foo"
-	// c.Field2 == 7
-	// c.Field3 == true
-	// c.Inner.Field4 == "inner too!"
-	
-	Use Map to get values from map[string]string instead:
-	
-	m := map[string]string{"KEY1": "bar"}
-	err := fromenv.Unmarshal(&c, fromenv.Map(m))
-	// c.Field1 == "bar"
-	// c.Field2 == 7
-	// ...
-
-Supply a setter function to handle your own types:
-
-timeSetter := func(t *time.Time, s string) error {
-
-
-	x, err := time.Parse(time.RFC3339, s)
-	*t = x
-	return err
-
-}
-urlSetter := func(u *url.URL, s string) error {
-
-
-	x, err := url.Parse(s)
-	*u = *x
-	return err
-
-}
-
-
-	 type config struct {
-		theTime  time.Time `env:"TIME"`
-		thePlace *url.URL  `env:"PLACE"`
-
-}
-var c config
-err := Unmarshal(&c, Map(env), SetFunc(timeSetter), SetFunc(urlSetter))
+Package fromenv can set tagged struct fields with values from the
+environment.
 
 
 
@@ -80,38 +24,46 @@ err := Unmarshal(&c, Map(env), SetFunc(timeSetter), SetFunc(urlSetter))
   * [func Map(m map[string]string) Option](#Map)
   * [func SetFunc(fn interface{}) Option](#SetFunc)
 
+#### <a name="pkg-examples">Examples</a>
+* [Package](#example_)
+* [SetFunc](#example_SetFunc)
+* [Package (Default)](#example__default)
+* [Package (Inner)](#example__inner)
 
 #### <a name="pkg-files">Package files</a>
-[fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) 
+[doc.go](/src/github.com/alfred-landrum/fromenv/doc.go) [fromenv.go](/src/github.com/alfred-landrum/fromenv/fromenv.go) 
 
 
 
 
 
-## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=2596:2651#L81)
+## <a name="Unmarshal">func</a> [Unmarshal](/src/target/fromenv.go?s=1432:1487#L34)
 ``` go
 func Unmarshal(in interface{}, options ...Option) error
 ```
-Unmarshal takes a pointer to a struct, recursively looks for struct
-fields with a "env" tag, and sets the field to the value of the
-environment variable given in the tag. An env tag may optionally
-specify a default value; the field will be set to this value if the
-environment variable is not present.
+Unmarshal takes a pointer to a struct, recursively looks for struct fields
+with a "env" tag, and, by default, uses the os.LookupEnv function to
+determine the desired value from the environment.
 
-By default, the "os.LookupEnv" function is used to find the value
-for an environment variable. See "Map" for an example of using a
-different lookup technique.
+An env tag may optionally specify a default desired value; if no entry exists
+in the environment for the field's key, then the desired value of the field
+will be this default value.
 
-A type T can be set if:
-- A function of "func(*T, string) error" been configured via the SetFunc option.
-- Type T implements a `func (T*) Set(string) error` method
-- It's one of the simple types: string, bool, int, uint8, uint16, uint32,
-uint64, int, int8, int16, int32, int64, float32, float64.
+Unmarshal will set the struct field (of type T) to the desired value by whichever method matches first:
+
+* Using a function of type "func(*T, string) error" configured via SetFunc.
+
+* If T satisfies an interface of `func Set(string) error`, then its Set function.
+
+* If T is a boolean, numeric, or string type, then the appropriate strconv function will be used.
+
+Unmarshal will return an error if the env tag is used on a struct field that
+can't be set with any of the above, or if the value's setting function fails.
 
 
 
 
-## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=3568:3630#L125)
+## <a name="LookupEnvFunc">type</a> [LookupEnvFunc](/src/target/fromenv.go?s=2404:2466#L78)
 ``` go
 type LookupEnvFunc func(key string) (value *string, err error)
 ```
@@ -128,7 +80,7 @@ is returned.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=5724:5749#L207)
+## <a name="Option">type</a> [Option](/src/target/fromenv.go?s=4560:4585#L160)
 ``` go
 type Option func(*config)
 ```
@@ -140,7 +92,7 @@ An Option is a functional option for Unmarshal.
 
 
 
-### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=4184:4210#L147)
+### <a name="DefaultsOnly">func</a> [DefaultsOnly](/src/target/fromenv.go?s=3020:3046#L100)
 ``` go
 func DefaultsOnly() Option
 ```
@@ -148,7 +100,7 @@ DefaultsOnly configures Unmarshal to only set fields with a tag-defined
 default to that default, ignoring other fields and the environment.
 
 
-### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=3719:3754#L129)
+### <a name="Looker">func</a> [Looker](/src/target/fromenv.go?s=2555:2590#L82)
 ``` go
 func Looker(f LookupEnvFunc) Option
 ```
@@ -156,14 +108,14 @@ Looker configures the environment lookup function used during an
 Unmarshal call.
 
 
-### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=3878:3914#L136)
+### <a name="Map">func</a> [Map](/src/target/fromenv.go?s=2714:2750#L89)
 ``` go
 func Map(m map[string]string) Option
 ```
 Map configures Unmarshal to use the given map for environment lookups.
 
 
-### <a name="SetFunc">func</a> [SetFunc](/src/target/fromenv.go?s=5372:5407#L192)
+### <a name="SetFunc">func</a> [SetFunc](/src/target/fromenv.go?s=4208:4243#L145)
 ``` go
 func SetFunc(fn interface{}) Option
 ```

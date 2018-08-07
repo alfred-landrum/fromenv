@@ -2,56 +2,6 @@
 // Use of this source code is governed by the license
 // found in the LICENSE.txt file.
 
-// Package fromenv can set specially tagged struct fields with values
-// from the environment.
-//
-//	var c struct {
-// 		Field1 string  	`env:"KEY1=my-default"`
-// 		Field2 int     	`env:"KEY2=7"`
-// 		Field3 bool    	`env:"KEY3"`
-// 		Inner struct {
-// 			Field4 string	`env:"KEY4"`
-// 		}
-// 	}
-//
-// 	os.Setenv("KEY1","foo")
-// 	os.Unsetenv("KEY2") // show default usage
-// 	os.Setenv("KEY3","true") // or 1, "1", etc.
-// 	os.Setenv("KEY4","inner too!")
-//
-// 	err := fromenv.Unmarshal(&c)
-// 	// c.Field1 == "foo"
-// 	// c.Field2 == 7
-// 	// c.Field3 == true
-// 	// c.Inner.Field4 == "inner too!"
-//
-// 	Use Map to get values from map[string]string instead:
-//
-// 	m := map[string]string{"KEY1": "bar"}
-// 	err := fromenv.Unmarshal(&c, fromenv.Map(m))
-// 	// c.Field1 == "bar"
-// 	// c.Field2 == 7
-// 	// ...
-//
-// Supply a setter function to handle your own types:
-//
-// timeSetter := func(t *time.Time, s string) error {
-// 	x, err := time.Parse(time.RFC3339, s)
-// 	*t = x
-// 	return err
-// }
-// urlSetter := func(u *url.URL, s string) error {
-// 	x, err := url.Parse(s)
-// 	*u = *x
-// 	return err
-// }
-//
-//  type config struct {
-// 	theTime  time.Time `env:"TIME"`
-// 	thePlace *url.URL  `env:"PLACE"`
-// }
-// var c config
-// err := Unmarshal(&c, Map(env), SetFunc(timeSetter), SetFunc(urlSetter))
 package fromenv
 
 import (
@@ -73,21 +23,24 @@ func (e *unmarshalError) Error() string {
 		e.cursor.field.Name, e.cursor.value.Kind().String(), e.cursor.structType.Name())
 }
 
-// Unmarshal takes a pointer to a struct, recursively looks for struct
-// fields with a "env" tag, and sets the field to the value of the
-// environment variable given in the tag. An env tag may optionally
-// specify a default value; the field will be set to this value if the
-// environment variable is not present.
+// Unmarshal takes a pointer to a struct, recursively looks for struct fields
+// with a "env" tag, and, by default, uses the os.LookupEnv function to
+// determine the desired value from the environment.
 //
-// By default, the "os.LookupEnv" function is used to find the value
-// for an environment variable. See "Map" for an example of using a
-// different lookup technique.
+// An env tag may optionally specify a default desired value; if no entry exists
+// in the environment for the field's key, then the desired value of the field
+// will be this default value.
 //
-// A type T can be set if:
-// - A function of "func(*T, string) error" been configured via the SetFunc option.
-// - Type T implements a `func (T*) Set(string) error` method
-// - It's one of the simple types: string, bool, int, uint8, uint16, uint32,
-// uint64, int, int8, int16, int32, int64, float32, float64.
+// Unmarshal will set the struct field (of type T) to the desired value by whichever method matches first:
+//
+// * Using a function of type "func(*T, string) error" configured via SetFunc.
+//
+// * If T satisfies an interface of `func Set(string) error`, then its Set function.
+//
+// * If T is a boolean, numeric, or string type, then the appropriate strconv function will be used.
+//
+// Unmarshal will return an error if the env tag is used on a struct field that
+// can't be set with any of the above, or if the value's setting function fails.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -224,11 +177,11 @@ func isStructPtr(i interface{}) bool {
 	return false
 }
 
-func osLookup(key string) (val *string, err error) {
+func osLookup(key string) (*string, error) {
 	if v, ok := os.LookupEnv(key); ok {
-		val = &v
+		return &v, nil
 	}
-	return
+	return nil, nil
 }
 
 type config struct {
@@ -299,7 +252,7 @@ func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 }
 
 // Set the struct field at the cursor to the given string.
-func setValue(cfg *config, value reflect.Value, str string) (err error) {
+func setValue(cfg *config, value reflect.Value, str string) error {
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
 			value.Set(reflect.New(value.Type().Elem()))
