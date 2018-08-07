@@ -6,7 +6,6 @@ package fromenv
 
 import (
 	"errors"
-	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -360,54 +359,80 @@ func TestSetter(t *testing.T) {
 	require.EqualError(t, err, "a-failing-setter: field TSI (struct) in struct S2")
 }
 
-func TestURL(t *testing.T) {
+func TestSetFunc(t *testing.T) {
 	t.Parallel()
 
-	env := map[string]string{
-		"k1": "http://www.sysdig.com",
-		"k2": "not-a-url",
-	}
+	t.Run("badfuncs", func(t *testing.T) {
+		t.Parallel()
 
-	type S1 struct {
-		U URL `env:"k1"`
-	}
+		badfuncs := []interface{}{
+			"hello",
+			func() {},
+			func(x int) {},
+			func(x int) error { return nil },
+			func(x int, y string) error { return nil },
+			func(x *int, y int) error { return nil },
+			func(x *int, y string) int { return 0 },
+		}
+		b0 := struct{}{}
+		for i := range badfuncs {
+			require.Panics(t, func() { Unmarshal(&b0, SetFunc(badfuncs[i])) })
+		}
+	})
 
-	var s1 S1
-	err := Unmarshal(&s1, Map(env))
-	require.NoError(t, err)
-	require.Equal(t, (*url.URL)(&s1.U).String(), env["k1"])
+	t.Run("simple", func(t *testing.T) {
+		t.Parallel()
 
-	type S2 struct {
-		U URL `env:"k2"`
-	}
+		durSetter := func(d *time.Duration, s string) error {
+			x, err := time.ParseDuration(s)
+			*d = x
+			return err
+		}
 
-	var s2 S2
-	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "parse not-a-url: invalid URI for request: field U (struct) in struct S2")
-}
+		env := map[string]string{
+			"k1": "5s",
+			"k2": "not-a-duration",
+		}
 
-func TestDuration(t *testing.T) {
-	t.Parallel()
+		type S1 struct {
+			D time.Duration `env:"k1"`
+		}
 
-	env := map[string]string{
-		"k1": "5s",
-		"k2": "not-a-duration",
-	}
+		var s1 S1
+		err := Unmarshal(&s1, Map(env), SetFunc(durSetter))
+		require.NoError(t, err)
+		require.Equal(t, s1.D, 5*time.Second)
 
-	type S1 struct {
-		D Duration `env:"k1"`
-	}
+		type S2 struct {
+			D time.Duration `env:"k2"`
+		}
 
-	var s1 S1
-	err := Unmarshal(&s1, Map(env))
-	require.NoError(t, err)
-	require.Equal(t, time.Duration(s1.D), 5*time.Second)
+		var s2 S2
+		err = Unmarshal(&s2, Map(env), SetFunc(durSetter))
+		require.EqualError(t, err, "time: invalid duration not-a-duration: field D (int64) in struct S2")
+	})
 
-	type S2 struct {
-		D Duration `env:"k2"`
-	}
+	t.Run("pointer", func(t *testing.T) {
+		t.Parallel()
 
-	var s2 S2
-	err = Unmarshal(&s2, Map(env))
-	require.EqualError(t, err, "time: invalid duration not-a-duration: field D (int64) in struct S2")
+		durSetter := func(d *time.Duration, s string) error {
+			x, err := time.ParseDuration(s)
+			*d = x
+			return err
+		}
+
+		env := map[string]string{
+			"k1": "5s",
+		}
+
+		type S1 struct {
+			D *time.Duration `env:"k1"`
+		}
+
+		var s1 S1
+		err := Unmarshal(&s1, Map(env), SetFunc(durSetter))
+		require.NoError(t, err)
+		require.Equal(t, *s1.D, 5*time.Second)
+	})
+
 }

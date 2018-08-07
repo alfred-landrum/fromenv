@@ -2,46 +2,15 @@
 // Use of this source code is governed by the license
 // found in the LICENSE.txt file.
 
-// Package fromenv can set specially tagged struct fields with values
-// from the environment.
-//
-//	var c struct {
-// 		Field1 string  	`env:"KEY1=my-default"`
-// 		Field2 int     	`env:"KEY2=7"`
-// 		Field3 bool    	`env:"KEY3"`
-// 		Inner struct {
-// 			Field4 string	`env:"KEY4"`
-// 		}
-// 	}
-//
-// 	os.Setenv("KEY1","foo")
-// 	os.Unsetenv("KEY2") // show default usage
-// 	os.Setenv("KEY3","true") // or 1, "1", etc.
-// 	os.Setenv("KEY4","inner too!")
-//
-// 	err := fromenv.Unmarshal(&c)
-// 	// c.Field1 == "foo"
-// 	// c.Field2 == 7
-// 	// c.Field3 == true
-// 	// c.Inner.Field4 == "inner too!"
-//
-// 	// Use Map to get values from map[string]string instead:
-// 	m := map[string]string{"KEY1": "bar"}
-// 	err := fromenv.Unmarshal(&c, fromenv.Map(m))
-// 	// c.Field1 == "bar"
-// 	// c.Field2 == 7
-// 	// ...
 package fromenv
 
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type unmarshalError struct {
@@ -54,21 +23,24 @@ func (e *unmarshalError) Error() string {
 		e.cursor.field.Name, e.cursor.value.Kind().String(), e.cursor.structType.Name())
 }
 
-// Unmarshal takes a pointer to a struct, recursively looks for struct
-// fields with a "env" tag, and sets the field to the value of the
-// environment variable given in the tag. An env tag may optionally
-// specify a default value; the field will be set to this value if the
-// environment variable is not present.
+// Unmarshal takes a pointer to a struct, recursively looks for struct fields
+// with a "env" tag, and, by default, uses the os.LookupEnv function to
+// determine the desired value from the environment.
 //
-// By default, the "os.LookupEnv" function is used to find the value
-// for an environment variable. See "Map" for an example of using a
-// different lookup technique.
+// An env tag may optionally specify a default desired value; if no entry exists
+// in the environment for the field's key, then the desired value of the field
+// will be this default value.
 //
-// Basic types supported are: string, bool, int, uint8, uint16, uint32,
-// uint64, int, int8, int16, int32, int64, float32, float64.
+// Unmarshal will set the struct field (of type T) to the desired value by whichever method matches first:
 //
-// Additionally, any type that has a `Set(string) error` method is also
-// supported.
+// * Using a function of type "func(*T, string) error" configured via SetFunc.
+//
+// * If T satisfies an interface of `func Set(string) error`, then its Set function.
+//
+// * If T is a boolean, numeric, or string type, then the appropriate strconv function will be used.
+//
+// Unmarshal will return an error if the env tag is used on a struct field that
+// can't be set with any of the above, or if the value's setting function fails.
 func Unmarshal(in interface{}, options ...Option) error {
 	// The input interface should be a non-nil pointer to struct.
 	if !isStructPtr(in) {
@@ -101,7 +73,7 @@ func Unmarshal(in interface{}, options ...Option) error {
 			val = defval
 		}
 
-		err = setValue(c.value, *val)
+		err = setValue(config, c.value, *val)
 		if err != nil {
 			return &unmarshalError{err, c}
 		}
@@ -139,6 +111,61 @@ func DefaultsOnly() Option {
 	return Map(nil)
 }
 
+type setFunc func(val reflect.Value, s string) error
+
+// validateSetFunc returns ok if fn is a "func(*T, string) error", returning
+// reflect.Type T and the equivalent of fn that takes a reflect.Value of type T.
+func validateSetFunc(fn interface{}) (argType reflect.Type, setFn setFunc, ok bool) {
+	fnValue := reflect.ValueOf(fn)
+	if fnValue.Kind() != reflect.Func {
+		return
+	}
+	fnType := fnValue.Type()
+	if !(fnType.NumIn() == 2 && !fnType.IsVariadic() && fnType.NumOut() == 1) {
+		return
+	}
+	a0 := fnType.In(0)
+	if a0.Kind() != reflect.Ptr {
+		return
+	}
+
+	if fnType.In(1) != reflect.TypeOf((*string)(nil)).Elem() {
+		return
+	}
+
+	errIface := reflect.TypeOf((*error)(nil)).Elem()
+	if !fnType.Out(0).Implements(errIface) {
+		return
+	}
+
+	argType = a0.Elem()
+	setFn = func(val reflect.Value, s string) error {
+		rets := fnValue.Call([]reflect.Value{val.Addr(), reflect.ValueOf(s)})
+		if rets[0].IsNil() {
+			return nil
+		}
+		return rets[0].Interface().(error)
+	}
+
+	return argType, setFn, true
+}
+
+// SetFunc takes a function of form "func(*T, string) error", and configures
+// Unmarshal to use that function to set the value of any type T's.
+func SetFunc(fn interface{}) Option {
+	return func(c *config) {
+		argType, setFn, ok := validateSetFunc(fn)
+		if !ok {
+			panic("expected a function matching: func(*T, string) error")
+		}
+
+		if c.setFuncs == nil {
+			c.setFuncs = make(map[reflect.Type]setFunc)
+		}
+		c.setFuncs[argType] = setFn
+	}
+}
+
 // An Option is a functional option for Unmarshal.
 type Option func(*config)
 
@@ -150,15 +177,16 @@ func isStructPtr(i interface{}) bool {
 	return false
 }
 
-func osLookup(key string) (val *string, err error) {
+func osLookup(key string) (*string, error) {
 	if v, ok := os.LookupEnv(key); ok {
-		val = &v
+		return &v, nil
 	}
-	return
+	return nil, nil
 }
 
 type config struct {
-	looker LookupEnvFunc
+	looker   LookupEnvFunc
+	setFuncs map[reflect.Type]setFunc
 }
 
 const (
@@ -224,12 +252,22 @@ func settableStructPtr(v reflect.Value) (reflect.Value, bool) {
 }
 
 // Set the struct field at the cursor to the given string.
-func setValue(value reflect.Value, str string) (err error) {
+func setValue(cfg *config, value reflect.Value, str string) error {
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		value = value.Elem()
+	}
+
 	if !value.CanSet() {
 		return errors.New("unsettable field")
 	}
 
-	// Check for an interface of `Set(string) error`.
+	if setfn, ok := cfg.setFuncs[value.Type()]; ok {
+		return setfn(value, str)
+	}
+
 	if s, ok := isSetter(value); ok {
 		return s.Set(str)
 	}
@@ -271,27 +309,4 @@ func isSetter(value reflect.Value) (setter, bool) {
 	i := value.Addr().Interface()
 	s, ok := i.(setter)
 	return s, ok
-}
-
-// URL is a convenience type to set a net/url.URL.
-type URL url.URL
-
-// Set via ParseRequestURI.
-func (u *URL) Set(s string) error {
-	x, err := url.ParseRequestURI(s)
-	if err != nil {
-		return err
-	}
-	*u = URL(*x)
-	return err
-}
-
-// Duration is a convenience type to set a time.Duration.
-type Duration time.Duration
-
-// Set via ParseDuration.
-func (d *Duration) Set(s string) error {
-	x, err := time.ParseDuration(s)
-	*d = (Duration)(x)
-	return err
 }
