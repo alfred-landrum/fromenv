@@ -15,7 +15,7 @@ import (
 
 type unmarshalError struct {
 	err    error
-	cursor cursor
+	cursor *cursor
 }
 
 func (e *unmarshalError) Error() string {
@@ -55,8 +55,8 @@ func Unmarshal(in interface{}, options ...Option) error {
 
 	// Visit each struct field reachable from the input interface,
 	// processing any fields with the "env" struct tag.
-	return visit(in, func(c cursor) error {
-		key, defval := parseTag(c.field)
+	return visit(in, func(c *cursor) error {
+		key, defval := parseTag(c)
 		if len(key) == 0 {
 			return nil
 		}
@@ -196,8 +196,8 @@ const (
 
 // parseTag returns the environment key and possible default value
 // encoded in the field struct tag.
-func parseTag(field *reflect.StructField) (string, *string) {
-	tag := field.Tag.Get(tagName)
+func parseTag(c *cursor) (string, *string) {
+	tag := c.field.Tag.Get(tagName)
 	s := strings.SplitN(tag, tagSep, 2)
 	if len(s) == 1 {
 		return s[0], nil
@@ -207,31 +207,30 @@ func parseTag(field *reflect.StructField) (string, *string) {
 
 type cursor struct {
 	structType reflect.Type
-	field      *reflect.StructField
+	field      reflect.StructField
 	value      reflect.Value
 }
 
-// visit executes visitor on any reachable struct fields from input.
-func visit(in interface{}, visitor func(cursor) error) error {
-	prev := make(map[reflect.Value]bool)
-	q := []reflect.Value{reflect.ValueOf(in)}
-
-	for len(q) != 0 {
-		var v reflect.Value
-		v, q = q[0], q[1:]
-		st, ok := settableStructPtr(v)
-		if !ok || prev[st] {
+// visit executes visitor on all reachable fields from its input struct.
+func visit(in interface{}, visitor func(*cursor) error) error {
+	prev := make(map[reflect.Value]struct{})
+	for q := []reflect.Value{reflect.ValueOf(in)} ; len(q) != 0 ; q = q[1:] {
+		structPtr, ok := settableStructPtr(q[0])
+		if !ok {
 			continue
 		}
-		prev[st] = true
+		if _, inPrev := prev[structPtr]; inPrev {
+			continue
+		}
+		prev[structPtr] = struct{}{}
 
-		stType := st.Type()
-		nfields := stType.NumField()
-		for i := 0; i < nfields; i++ {
-			field := stType.Field(i)
-			value := st.Field(i)
-			err := visitor(cursor{stType, &field, value})
-			if err != nil {
+		structType := structPtr.Type()
+		n := structType.NumField()
+		for i := 0; i < n; i++ {
+			field := structType.Field(i)
+			value := structPtr.Field(i)
+			c := cursor{structType, field, value}
+			if err := visitor(&c); err != nil {
 				return err
 			}
 			q = append(q, value)
