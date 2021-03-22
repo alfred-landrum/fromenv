@@ -409,7 +409,8 @@ func TestSetFunc(t *testing.T) {
 
 		var s2 S2
 		err = Unmarshal(&s2, Map(env), SetFunc(durSetter))
-		require.EqualError(t, err, "time: invalid duration not-a-duration: field D (int64) in struct S2")
+		require.Error(t, err)
+		require.Regexp(t, ".*invalid duration.*field D", err)
 	})
 
 	t.Run("pointer", func(t *testing.T) {
